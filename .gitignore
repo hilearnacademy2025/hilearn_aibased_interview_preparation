@@ -1,0 +1,48 @@
+# ============================================================
+# HiLearn AI Interview Prep - .gitignore
+# ============================================================
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Environment variables (NEVER commit this!)
+.env
+*.env.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Uploads & generated files
+uploads/
+*.wav
+*.mp3
+*.webm
+*.pdf
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+*.log
+
+# ChromaDB local data
+chroma_data/
