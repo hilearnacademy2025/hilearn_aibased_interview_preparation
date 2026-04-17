@@ -158,6 +158,7 @@ class CommunicationAnalysis(BaseModel):
     speaking_pace_wpm: Optional[int] = None   # words per minute
     confidence_score: float = 0.0             # 0.0 - 10.0
     clarity_score: float = 0.0               # 0.0 - 10.0
+    silence_ratio: Optional[float] = None     # fraction of audio that is silence (Day 3)
 
 
 class AnswerFeedback(BaseModel):
@@ -186,3 +187,40 @@ class SubmitAnswerResponse(BaseModel):
     session_status: SessionStatus
     is_follow_up: bool = False   # True if AI asks a follow-up (real-time conversation)
     message: str
+    transcription: Optional[str] = None        # Day 3: Whisper STT result (if audio provided)
+
+
+# ─────────────────────────────────────────────────────────
+# Day 3: Voice / Transcription Endpoint Schemas
+# ─────────────────────────────────────────────────────────
+
+class TranscribeResponse(BaseModel):
+    """Response for POST /interview/transcribe-audio"""
+    transcription: str = Field(..., description="Whisper speech-to-text output")
+    confidence: float = Field(..., ge=0.0, le=1.0, description="Transcription confidence (0-1)")
+    language: Optional[str] = Field(default=None, description="Detected spoken language")
+    duration_seconds: float = Field(default=0.0, description="Audio clip duration in seconds")
+    voice_analysis: Optional["VoiceAnalysisResponse"] = Field(
+        default=None,
+        description="Librosa voice metrics derived from the transcription",
+    )
+
+
+class VoiceAnalysisResponse(BaseModel):
+    """Librosa voice metrics returned alongside transcription."""
+    filler_count: int = Field(..., description="Total filler word occurrences")
+    filler_words_detected: List[str] = Field(
+        default_factory=list,
+        description="Unique filler words found e.g. ['um', 'like']",
+    )
+    wpm: int = Field(..., description="Speaking pace in words-per-minute")
+    confidence_score: float = Field(..., ge=0, le=10, description="Confidence score 0-10")
+    clarity_score: float = Field(..., ge=0, le=10, description="Clarity/pacing score 0-10")
+    silence_ratio: float = Field(
+        ..., ge=0, le=1,
+        description="Fraction of audio that is silence (0 = none, 1 = all silence)",
+    )
+
+
+# Allow forward reference resolution
+TranscribeResponse.model_rebuild()
