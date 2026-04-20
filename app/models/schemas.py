@@ -224,3 +224,96 @@ class VoiceAnalysisResponse(BaseModel):
 
 # Allow forward reference resolution
 TranscribeResponse.model_rebuild()
+
+
+# ─────────────────────────────────────────────────────────
+# Authentication Models
+# ─────────────────────────────────────────────────────────
+
+class UserRole(str, Enum):
+    """User role for access control."""
+    STUDENT = "student"
+    ADMIN = "admin"
+
+
+class SignupRequest(BaseModel):
+    """Payload for user registration."""
+    email: str = Field(
+        ...,
+        description="User's email address (must be unique)",
+        examples=["rahil@hilearn.in"],
+    )
+    password: str = Field(
+        ...,
+        min_length=8,
+        max_length=128,
+        description="Strong password (min 8 characters)",
+    )
+    name: str = Field(
+        ...,
+        min_length=2,
+        max_length=100,
+        description="User's full name",
+        examples=["Rahil Shah"],
+    )
+    role: UserRole = Field(
+        default=UserRole.STUDENT,
+        description="User role: student or admin",
+    )
+
+
+class LoginRequest(BaseModel):
+    """Payload for user login."""
+    email: str = Field(
+        ...,
+        description="Registered email address",
+        examples=["rahil@hilearn.in"],
+    )
+    password: str = Field(
+        ...,
+        description="Account password",
+    )
+
+
+class AuthResponse(BaseModel):
+    """Successful authentication response (signup / login)."""
+    user_id: str = Field(..., description="Unique user identifier")
+    token: str = Field(..., description="JWT access token")
+    role: str = Field(..., description="User role (student/admin)")
+    message: str = Field(default="Authentication successful")
+
+
+class TokenRefreshRequest(BaseModel):
+    """Payload for refreshing an access token."""
+    token: str = Field(
+        ...,
+        description="Current valid (or recently expired) JWT token",
+    )
+
+
+class TokenResponse(BaseModel):
+    """Response containing a new access token."""
+    access_token: str = Field(..., description="New JWT access token")
+    token_type: str = Field(default="bearer")
+
+
+class UserProfile(BaseModel):
+    """Public-facing user profile (returned by /auth/me)."""
+    user_id: str
+    email: str
+    name: str
+    role: UserRole
+    created_at: datetime
+
+
+class UserInDB(BaseModel):
+    """
+    Internal user model stored in the database.
+    NEVER return this model directly — it contains the hashed password.
+    """
+    user_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    email: str
+    name: str
+    role: UserRole = UserRole.STUDENT
+    hashed_password: str
+    created_at: datetime = Field(default_factory=datetime.utcnow)
