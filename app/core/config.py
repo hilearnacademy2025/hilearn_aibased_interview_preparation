@@ -50,10 +50,9 @@ class Settings(BaseSettings):
     groq_max_tokens: int = 2048
     groq_temperature: float = 0.7
 
-    # ── OpenAI Whisper (STT) ──────────────────────────────────────────────
-    # TODO (Day 3): Activate Whisper integration
-    openai_api_key: str = "sk-placeholder"
-    whisper_model: str = "whisper-1"
+    # ── Google Cloud Speech-to-Text (STT) ─────────────────────────────────
+    google_cloud_project_id: str = "dummy-project"
+    google_cloud_credentials_json: str = "path/to/dummy/credentials.json"
 
     # ── File Upload ───────────────────────────────────────────────────────
     max_upload_size_mb: int = 10

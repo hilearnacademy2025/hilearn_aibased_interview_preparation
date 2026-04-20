@@ -1,10 +1,11 @@
 """
 HiLearn AI Interview Prep - Interview Routes
-POST /start-interview   →  Begin a new session
-POST /submit-answer     →  Submit answer and get feedback
-GET  /session/{id}      →  Retrieve session details
+POST /start-interview      →  Begin a new session
+POST /submit-answer        →  Submit answer and get AI feedback
+POST /transcribe-audio     →  (Day 3) Google Cloud STT + Librosa voice analysis
+GET  /session/{id}         →  Retrieve session details
 """
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, UploadFile, File
 from loguru import logger
 
 from app.models.schemas import (
@@ -13,8 +14,11 @@ from app.models.schemas import (
     StartInterviewResponse,
     SubmitAnswerRequest,
     SubmitAnswerResponse,
+    TranscribeResponse,
+    VoiceAnalysisResponse,
 )
 from app.services.interview_service import interview_service
+from app.services.voice_service import transcribe_audio, analyze_voice
 
 router = APIRouter(prefix="/interview", tags=["Interview"])
 
@@ -82,9 +86,107 @@ async def submit_answer(payload: SubmitAnswerRequest) -> SubmitAnswerResponse:
     logger.info(
         f"[SUBMIT-ANSWER] session={payload.session_id} "
         f"question={payload.question_id} "
-        f"answer_length={len(payload.answer_text)}"
+        f"answer_length={len(payload.answer_text)} "
+        f"has_audio={bool(payload.audio_file_url)}"
     )
     return await interview_service.submit_answer(payload)
+
+
+# ─────────────────────────────────────────────────────────
+# POST /interview/transcribe-audio  (Day 3)
+# ─────────────────────────────────────────────────────────
+@router.post(
+    "/transcribe-audio",
+    response_model=TranscribeResponse,
+    summary="Transcribe & Analyse Audio",
+    description=(
+        "Upload an audio file (MP3 / WAV / OGG / M4A / WebM). "
+        "The endpoint transcribes it using Google Cloud Speech-to-Text and then analyses "
+        "communication quality (filler words, speaking pace, confidence) via Librosa. "
+        "**Max size: 10 MB.** Falls back gracefully on any processing error."
+    ),
+    tags=["Interview"],
+)
+async def transcribe_audio_endpoint(
+    audio_file: UploadFile = File(
+        ...,
+        description="Audio file to transcribe. Accepted formats: MP3, WAV, OGG, M4A, WebM.",
+    ),
+) -> TranscribeResponse:
+    """
+    **Day 3 — Voice Analysis Pipeline**
+
+    1. Read uploaded audio bytes
+    2. Call Google Cloud Speech-to-Text for speech-to-text
+    3. Call Librosa for filler-word detection + pacing analysis
+    4. Return combined result
+
+    If Google STT fails, transcription is empty and confidence = 0.
+    If Librosa fails, voice metrics fall back to sensible defaults.
+    """
+    MAX_BYTES = 10 * 1024 * 1024  # 10 MB hard limit
+
+    logger.info(
+        "[TRANSCRIBE-AUDIO] file={} | content_type={}",
+        audio_file.filename, audio_file.content_type,
+    )
+
+    # ── Validate content type ─────────────────────────────────────────
+    allowed_types = {
+        "audio/mpeg", "audio/mp3", "audio/wav", "audio/x-wav",
+        "audio/ogg", "audio/webm", "audio/mp4", "audio/m4a",
+        "audio/x-m4a", "application/octet-stream",  # fallback for unknown
+    }
+    ct = (audio_file.content_type or "").lower()
+    if ct and ct not in allowed_types:
+        raise HTTPException(
+            status_code=415,
+            detail=f"Unsupported audio format: '{ct}'. Use MP3, WAV, OGG, or M4A.",
+        )
+
+    # ── Read bytes with size guard ────────────────────────────────────
+    audio_bytes = await audio_file.read(MAX_BYTES + 1)
+    if len(audio_bytes) > MAX_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail="Audio file exceeds 10 MB limit.",
+        )
+
+    filename = audio_file.filename or "audio.mp3"
+
+    # ── Whisper Transcription ─────────────────────────────────────────
+    transcribe_result = await transcribe_audio(audio_bytes, filename)
+
+    # ── Librosa Voice Analysis ────────────────────────────────────────
+    voice_result = await analyze_voice(
+        audio_bytes=audio_bytes,
+        filename=filename,
+        transcription=transcribe_result.transcription,
+        duration_seconds=transcribe_result.duration_seconds,
+    )
+
+    logger.success(
+        "[TRANSCRIBE-AUDIO] done | words={} | fillers={} | wpm={} | confidence_score={}",
+        len(transcribe_result.transcription.split()),
+        voice_result.filler_count,
+        voice_result.wpm,
+        voice_result.confidence_score,
+    )
+
+    return TranscribeResponse(
+        transcription=transcribe_result.transcription,
+        confidence=transcribe_result.confidence,
+        language=transcribe_result.language,
+        duration_seconds=transcribe_result.duration_seconds,
+        voice_analysis=VoiceAnalysisResponse(
+            filler_count=voice_result.filler_count,
+            filler_words_detected=voice_result.filler_words_detected,
+            wpm=voice_result.wpm,
+            confidence_score=voice_result.confidence_score,
+            clarity_score=voice_result.clarity_score,
+            silence_ratio=voice_result.silence_ratio,
+        ),
+    )
 
 
 # ─────────────────────────────────────────────────────────

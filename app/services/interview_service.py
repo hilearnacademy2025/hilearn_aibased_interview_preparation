@@ -3,7 +3,7 @@ HiLearn AI Interview Prep - Interview Service Layer
 Business logic for managing interview sessions.
 
 Day 2: Groq AI integrated for question generation & answer evaluation. ✅
-TODO (Day 3): Wire up OpenAI Whisper for voice analysis.
+Day 3: Google Cloud Speech-to-Text (STT) + Librosa voice analysis wired in.       ✅
 TODO (Day 4): Wire up MongoDB for session persistence.
 """
 import json
@@ -27,6 +27,7 @@ from app.models.schemas import (
     SubmitAnswerRequest,
     SubmitAnswerResponse,
 )
+from app.services.voice_service import process_audio_url
 
 settings = get_settings()
 
@@ -426,6 +427,60 @@ class InterviewService:
 
         # Build AnswerFeedback using Groq scores
         derived = round(content_score * 0.95, 1)
+        # ── Day 3: Real Voice Analysis (Google Cloud STT + Librosa) ───────────────
+        transcription_text: Optional[str] = None
+        communication = CommunicationAnalysis(
+            filler_words_count=0,
+            confidence_score=7.5,   # fallback — overwritten below if audio present
+            clarity_score=7.5,      # fallback
+        )
+
+        audio_url = getattr(payload, "audio_file_url", None)
+        if audio_url:
+            logger.info(
+                "Voice | audio_url detected | session={} | url={}",
+                payload.session_id, audio_url,
+            )
+            try:
+                transcribe_result, voice_result = await process_audio_url(audio_url)
+
+                # Prefer Whisper transcription over typed answer when available
+                if transcribe_result.success and transcribe_result.transcription:
+                    transcription_text = transcribe_result.transcription
+                    logger.info(
+                        "Voice | using Whisper transcription ({} words)",
+                        len(transcription_text.split()),
+                    )
+
+                communication = CommunicationAnalysis(
+                    filler_words_count=voice_result.filler_count,
+                    filler_words_detected=voice_result.filler_words_detected,
+                    speaking_pace_wpm=voice_result.wpm if voice_result.wpm > 0 else None,
+                    confidence_score=voice_result.confidence_score,
+                    clarity_score=voice_result.clarity_score,
+                    silence_ratio=voice_result.silence_ratio,
+                )
+                logger.success(
+                    "Voice | analysis complete | fillers={} | wpm={} | "
+                    "confidence={} | clarity={}",
+                    voice_result.filler_count,
+                    voice_result.wpm,
+                    voice_result.confidence_score,
+                    voice_result.clarity_score,
+                )
+            except Exception as exc:
+                logger.warning(
+                    "Voice | pipeline failed | session={} | error={} | "
+                    "falling back to mock scores",
+                    payload.session_id, exc,
+                )
+                # communication already has mock 7.5 fallback values
+        else:
+            logger.debug(
+                "Voice | no audio_url | session={} | using mock scores",
+                payload.session_id,
+            )
+
         feedback = AnswerFeedback(
             content_score=round(content_score, 1),
             completeness_score=round(content_score * 0.9, 1),
@@ -441,11 +496,7 @@ class InterviewService:
             ],
             ideal_answer_hint="Focus on concrete examples and measurable outcomes.",
             lms_course_recommendation="Check HiLearn course: 'Ace Technical Interviews' 📚",
-            communication=CommunicationAnalysis(
-                filler_words_count=0,       # TODO (Day 3): Librosa analysis
-                confidence_score=7.5,       # TODO (Day 3): voice analysis
-                clarity_score=7.5,          # TODO (Day 3): voice analysis
-            ),
+            communication=communication,
         )
 
         # ── Advance to Next Question ───────────────────────────────────────
@@ -476,6 +527,7 @@ class InterviewService:
             questions_answered=next_q_index,
             total_questions=len(questions),
             session_status=session["status"],
+            transcription=transcription_text,
             message=(
                 "Great answer! Here's your next question 🚀"
                 if not is_session_complete
