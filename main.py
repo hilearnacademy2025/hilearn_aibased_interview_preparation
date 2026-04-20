@@ -11,6 +11,7 @@ API Docs:
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from app.db.database import db
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 
@@ -27,37 +28,75 @@ settings = get_settings()
 # ─────────────────────────────────────────────────────────
 # Lifespan (startup / shutdown events)
 # ─────────────────────────────────────────────────────────
+# @asynccontextmanager
+# async def lifespan(app: FastAPI):
+#     """
+#     Application lifecycle hooks.
+
+#     Startup:
+#         - Validate environment config
+#         - TODO (Day 4): Connect to MongoDB
+#         - TODO (Day 2): Warm up Groq client
+#         - TODO (Day 3): Initialise ChromaDB collection
+
+#     Shutdown:
+#         - TODO (Day 4): Close MongoDB connection pool
+#     """
+#     # ── STARTUP ─────────────────────────────────────────
+#     logger.info("=" * 60)
+#     logger.info(f"  🚀 {settings.app_name} v{settings.app_version}")
+#     logger.info(f"  Environment : {settings.environment}")
+#     logger.info(f"  Debug mode  : {settings.debug}")
+#     logger.info(f"  CORS origins: {settings.cors_origins}")
+#     logger.info("=" * 60)
+
+#     # TODO (Day 4): MongoDB connection
+#     # from app.core.database import connect_to_mongo
+#     # await connect_to_mongo()
+#     # logger.info("✅ MongoDB connected")
+
+#     # TODO (Day 2): Groq client warm-up
+#     # from groq import AsyncGroq
+#     # app.state.groq = AsyncGroq(api_key=settings.groq_api_key)
+#     # logger.info("✅ Groq client initialised (llama-3.3-70b)")
+    
+#     try:
+#         collections = await db.list_collection_names()
+#         logger.info(f"✅ MongoDB connected | Collections: {collections}")
+#     except Exception as e:
+#         logger.error(f"❌ MongoDB connection failed: {e}")
+
+
+
+#     logger.info("✅ HiLearn backend started successfully!")
+
+#     yield   # ← app is running
+
+#    # ── SHUTDOWN ─────────────────────────────────────────
+# logger.info("🛑 Shutting down HiLearn backend...")
+
+# try:
+#     db.client.close()
+#     logger.info("✅ MongoDB connection closed")
+# except Exception as e:
+#     logger.error(f"Error closing MongoDB: {e}")
+
+# logger.info("Bye! 👋")
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """
-    Application lifecycle hooks.
 
-    Startup:
-        - Validate environment config
-        - TODO (Day 4): Connect to MongoDB
-        - TODO (Day 2): Warm up Groq client
-        - TODO (Day 3): Initialise ChromaDB collection
-
-    Shutdown:
-        - TODO (Day 4): Close MongoDB connection pool
-    """
     # ── STARTUP ─────────────────────────────────────────
     logger.info("=" * 60)
     logger.info(f"  🚀 {settings.app_name} v{settings.app_version}")
     logger.info(f"  Environment : {settings.environment}")
     logger.info(f"  Debug mode  : {settings.debug}")
-    logger.info(f"  CORS origins: {settings.cors_origins}")
-    logger.info("=" * 60)
-
-    # TODO (Day 4): MongoDB connection
-    # from app.core.database import connect_to_mongo
-    # await connect_to_mongo()
-    # logger.info("✅ MongoDB connected")
-
-    # TODO (Day 2): Groq client warm-up
-    # from groq import AsyncGroq
-    # app.state.groq = AsyncGroq(api_key=settings.groq_api_key)
-    # logger.info("✅ Groq client initialised (llama-3.3-70b)")
+    
+    try:
+        collections = await db.list_collection_names()
+        logger.info(f"✅ MongoDB connected | Collections: {collections}")
+    except Exception as e:
+        logger.error(f"❌ MongoDB connection failed: {e}")
 
     logger.info("✅ HiLearn backend started successfully!")
 
@@ -65,7 +104,13 @@ async def lifespan(app: FastAPI):
 
     # ── SHUTDOWN ─────────────────────────────────────────
     logger.info("🛑 Shutting down HiLearn backend...")
-    # TODO (Day 4): await disconnect_from_mongo()
+
+    try:
+        db.client.close()
+        logger.info("✅ MongoDB connection closed")
+    except Exception as e:
+        logger.error(f"Error closing MongoDB: {e}")
+
     logger.info("Bye! 👋")
 
 
