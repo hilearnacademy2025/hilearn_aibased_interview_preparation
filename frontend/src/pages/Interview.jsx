@@ -1,523 +1,28 @@
-
-
-// import { useEffect, useMemo, useRef, useState } from 'react'
-// import { motion as Motion } from 'framer-motion'
-// import { useNavigate } from 'react-router-dom'
-// import Button from '../components/common/Button'
-// import Loader from '../components/common/Loader'
-// import { startInterview, submitAnswer } from '../utils/api'
-
-// const interviewTypes = [
-//   { value: 'technical', label: 'Technical', icon: '💻', description: 'Coding, algorithms, system design' },
-//   { value: 'behavioral', label: 'Behavioral', icon: '🗣️', description: 'Past experiences, teamwork, leadership' },
-//   { value: 'hr', label: 'HR', icon: '👥', description: 'Company fit, career goals' },
-//   { value: 'domain_specific', label: 'Domain specific', icon: '🎯', description: 'Industry-specific knowledge' },
-// ]
-
-// const difficultyOptions = [
-//   { value: 'beginner', label: 'Beginner', color: 'emerald', description: 'Basic concepts' },
-//   { value: 'intermediate', label: 'Intermediate', color: 'blue', description: 'Practical scenarios' },
-//   { value: 'advanced', label: 'Advanced', color: 'purple', description: 'Complex problems' },
-// ]
-
-// function Interview() {
-//   const navigate = useNavigate()
-//   const [stage, setStage] = useState('setup')
-//   const [loading, setLoading] = useState(false)
-//   const [error, setError] = useState('')
-//   const [timer, setTimer] = useState(0)
-//   const [session, setSession] = useState(null)
-//   const [question, setQuestion] = useState(null)
-//   const [answer, setAnswer] = useState('')
-//   const [hoveredType, setHoveredType] = useState(null)
-//   const [hoveredDifficulty, setHoveredDifficulty] = useState(null)
-//   const [form, setForm] = useState({
-//     user_id: 'student_demo',
-//     job_role: '',
-//     interview_type: 'technical',
-//     difficulty: 'intermediate',
-//     tech_stack: '',
-//     resume_text: '',
-//     target_companies: '',
-//   })
-//   const timerRef = useRef(null)
-
-//   useEffect(() => {
-//     if (stage === 'live') {
-//       timerRef.current = window.setInterval(() => setTimer((previous) => previous + 1), 1000)
-//     }
-
-//     return () => {
-//       if (timerRef.current) {
-//         window.clearInterval(timerRef.current)
-//       }
-//     }
-//   }, [stage, question?.question_id])
-
-//   const formattedTime = useMemo(() => {
-//     const minutes = String(Math.floor(timer / 60)).padStart(2, '0')
-//     const seconds = String(timer % 60).padStart(2, '0')
-//     return `${minutes}:${seconds}`
-//   }, [timer])
-
-//   const handleStartInterview = async () => {
-//     if (!form.job_role.trim()) {
-//       setError('✨ Add your target job role to start the interview.')
-//       return
-//     }
-
-//     setLoading(true)
-//     setError('')
-//     try {
-//       const payload = {
-//         ...form,
-//         tech_stack: form.tech_stack ? form.tech_stack.split(',').map((item) => item.trim()).filter(Boolean) : undefined,
-//         target_companies: form.target_companies ? form.target_companies.split(',').map((item) => item.trim()).filter(Boolean) : undefined,
-//         resume_text: form.resume_text || undefined,
-//       }
-
-//       const response = await startInterview(payload)
-//       setSession(response)
-//       setQuestion(response.first_question)
-//       setStage('live')
-//       setTimer(0)
-//       window.localStorage.setItem('hilearn_session_id', response.session_id)
-//     } catch (requestError) {
-//       setError(requestError.message)
-//     } finally {
-//       setLoading(false)
-//     }
-//   }
-
-//   const handleSubmit = async () => {
-//     if (!answer.trim() || !session || !question) {
-//       setError('✍️ Write your answer before sending it for feedback.')
-//       return
-//     }
-
-//     setLoading(true)
-//     setError('')
-//     try {
-//       const response = await submitAnswer({
-//         session_id: session.session_id,
-//         question_id: question.question_id,
-//         answer_text: answer,
-//         answer_duration_seconds: timer,
-//       })
-
-//       window.localStorage.setItem('hilearn_latest_score', String(response.feedback.overall_score))
-//       window.localStorage.setItem('hilearn_feedback', JSON.stringify(response))
-
-//       // ✅ Agar next question hai toh dikhao
-//       if (response.next_question) {
-//         setQuestion(response.next_question)
-//         setAnswer('')
-//         setTimer(0)
-//         if (timerRef.current) window.clearInterval(timerRef.current)
-//       } else {
-//         // ✅ Koi question nahi bachaa — ab feedback pe jao
-//         if (timerRef.current) window.clearInterval(timerRef.current)
-//         navigate('/feedback', {
-//           state: { feedbackResponse: response, session },
-//         })
-//       }
-//     } catch (requestError) {
-//       setError(requestError.message)
-//     } finally {
-//       setLoading(false)
-//     }
-//   }
-
-//   if (loading && stage === 'setup') {
-//     return <Loader label="🎯 Starting your interview room..." />
-//   }
-
-//   return (
-//     <Motion.div
-//       initial={{ opacity: 0, y: 14 }}
-//       animate={{ opacity: 1, y: 0 }}
-//       className="min-h-screen bg-gray-100 py-14 px-4"
-//     >
-//       <div className="max-w-7xl mx-auto">
-
-//         {stage === 'setup' && (
-//           <div className="grid gap-8 xl:grid-cols-[0.92fr_1.08fr]">
-
-//             {/* Left Section - Info */}
-//             <div className="space-y-6">
-//               <Motion.div
-//                 initial={{ opacity: 0, x: -20 }}
-//                 animate={{ opacity: 1, x: 0 }}
-//                 transition={{ duration: 0.5 }}
-//                 className="rounded-2xl bg-gradient-to-br from-blue-800 via-blue-700 to-blue-600 p-8 text-white shadow-xl shadow-blue-500/30"
-//               >
-//                 <p className="text-sm font-semibold uppercase tracking-[0.24em] text-blue-100">
-//                   🎙️ Interview lab
-//                 </p>
-//                 <h1 className="mt-3 text-4xl font-bold tracking-tight">
-//                   Step into a calm, realistic practice room.
-//                 </h1>
-//                 <p className="mt-4 max-w-xl text-base leading-7 text-blue-100">
-//                   Choose your interview type, role, and difficulty, then launch a backend-connected session with the first live AI question.
-//                 </p>
-//                 <div className="mt-6 grid gap-3 sm:grid-cols-3">
-//                   {[
-//                     { emoji: '🎯', text: 'Role setup' },
-//                     { emoji: '💬', text: 'Live question flow' },
-//                     { emoji: '📊', text: 'Feedback after each answer' },
-//                   ].map((item) => (
-//                     <div key={item.text} className="rounded-xl bg-white/15 px-4 py-3 text-sm font-medium text-white backdrop-blur-sm">
-//                       {item.emoji} {item.text}
-//                     </div>
-//                   ))}
-//                 </div>
-//               </Motion.div>
-
-//               <Motion.div
-//                 initial={{ opacity: 0, x: -20 }}
-//                 animate={{ opacity: 1, x: 0 }}
-//                 transition={{ delay: 0.1, duration: 0.5 }}
-//                 className="rounded-2xl border border-blue-200 bg-white p-6 shadow-lg shadow-blue-200/50"
-//               >
-//                 <p className="text-sm font-semibold text-gray-900">🔌 What this setup connects to</p>
-//                 <div className="mt-4 space-y-3">
-//                   {[
-//                     'Starts real interview sessions from FastAPI',
-//                     'Submits typed answers to the existing feedback endpoint',
-//                     'Stores only lightweight session context in localStorage',
-//                   ].map((item, idx) => (
-//                     <Motion.div
-//                       key={item}
-//                       initial={{ opacity: 0, x: -10 }}
-//                       animate={{ opacity: 1, x: 0 }}
-//                       transition={{ delay: 0.2 + idx * 0.1 }}
-//                       className="flex items-center gap-3 text-sm text-gray-600"
-//                     >
-//                       <span className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-100 text-blue-600 text-xs">✓</span>
-//                       <span>{item}</span>
-//                     </Motion.div>
-//                   ))}
-//                 </div>
-//               </Motion.div>
-
-//               {/* Tips Card - Enhanced */}
-//               <Motion.div
-//                 initial={{ opacity: 0, x: -20 }}
-//                 animate={{ opacity: 1, x: 0 }}
-//                 transition={{ delay: 0.2, duration: 0.5 }}
-//                 className="rounded-2xl bg-gradient-to-r from-blue-50 to-white p-6 border border-blue-200"
-//               >
-//                 <p className="text-sm font-semibold text-blue-600">💡 Pro Tips for Success</p>
-//                 <div className="mt-3 space-y-2">
-//                   <p className="text-sm text-gray-600">• Be specific with your tech stack and target companies</p>
-//                   <p className="text-sm text-gray-600">• Use STAR method (Situation, Task, Action, Result)</p>
-//                   <p className="text-sm text-gray-600">• Practice speaking clearly and concisely</p>
-//                 </div>
-//               </Motion.div>
-
-//               {/* Quick Stats */}
-//               <Motion.div
-//                 initial={{ opacity: 0, x: -20 }}
-//                 animate={{ opacity: 1, x: 0 }}
-//                 transition={{ delay: 0.25, duration: 0.5 }}
-//                 className="rounded-2xl bg-white p-6 border border-blue-200 shadow-md"
-//               >
-//                 <div className="flex items-center justify-between">
-//                   <div className="text-center flex-1">
-//                     <p className="text-2xl font-bold text-blue-600">10K+</p>
-//                     <p className="text-xs text-gray-500">Interviews Completed</p>
-//                   </div>
-//                   <div className="w-px h-8 bg-gray-200" />
-//                   <div className="text-center flex-1">
-//                     <p className="text-2xl font-bold text-blue-600">92%</p>
-//                     <p className="text-xs text-gray-500">Confidence Boost</p>
-//                   </div>
-//                   <div className="w-px h-8 bg-gray-200" />
-//                   <div className="text-center flex-1">
-//                     <p className="text-2xl font-bold text-blue-600">4.9</p>
-//                     <p className="text-xs text-gray-500">Student Rating</p>
-//                   </div>
-//                 </div>
-//               </Motion.div>
-//             </div>
-
-//             {/* Right Section - Form */}
-//             <Motion.div
-//               initial={{ opacity: 0, x: 20 }}
-//               animate={{ opacity: 1, x: 0 }}
-//               transition={{ duration: 0.5 }}
-//               className="rounded-2xl border border-blue-200 bg-white p-8 shadow-xl shadow-blue-200/50"
-//             >
-//               <h2 className="text-2xl font-bold text-gray-900 mb-2">🎮 Interview Setup</h2>
-//               <p className="text-sm text-gray-500 mb-6">Fill in the details to get personalized questions</p>
-
-//               <div className="grid gap-5 md:grid-cols-2">
-//                 <label className="space-y-2 md:col-span-2">
-//                   <span className="text-sm font-medium text-gray-700">🎯 Target role <span className="text-red-500">*</span></span>
-//                   <input
-//                     value={form.job_role}
-//                     onChange={(event) => setForm((previous) => ({ ...previous, job_role: event.target.value }))}
-//                     placeholder="e.g., Frontend Developer, Data Analyst, SDE Intern"
-//                     className="w-full rounded-xl border border-gray-200 px-4 py-3 text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
-//                   />
-//                 </label>
-
-//                 <label className="space-y-2">
-//                   <span className="text-sm font-medium text-gray-700">📋 Interview type</span>
-//                   <div className="grid grid-cols-2 gap-2">
-//                     {interviewTypes.map((item) => (
-//                       <Motion.div
-//                         key={item.value}
-//                         whileHover={{ scale: 1.02 }}
-//                         onClick={() => setForm((prev) => ({ ...prev, interview_type: item.value }))}
-//                         onMouseEnter={() => setHoveredType(item.value)}
-//                         onMouseLeave={() => setHoveredType(null)}
-//                         className={`cursor-pointer rounded-xl border p-3 text-center transition-all duration-200 ${form.interview_type === item.value
-//                             ? 'border-blue-500 bg-blue-50 text-blue-700'
-//                             : 'border-gray-200 bg-white text-gray-600 hover:border-blue-300 hover:bg-blue-50'
-//                           }`}
-//                       >
-//                         <span className="text-xl block mb-1">{item.icon}</span>
-//                         <span className="text-sm font-medium">{item.label}</span>
-//                         {hoveredType === item.value && (
-//                           <p className="text-xs text-gray-400 mt-1">{item.description}</p>
-//                         )}
-//                       </Motion.div>
-//                     ))}
-//                   </div>
-//                 </label>
-
-//                 <label className="space-y-2">
-//                   <span className="text-sm font-medium text-gray-700">⚡ Difficulty</span>
-//                   <div className="flex gap-2">
-//                     {difficultyOptions.map((item) => (
-//                       <Motion.div
-//                         key={item.value}
-//                         whileHover={{ scale: 1.02 }}
-//                         onClick={() => setForm((prev) => ({ ...prev, difficulty: item.value }))}
-//                         onMouseEnter={() => setHoveredDifficulty(item.value)}
-//                         onMouseLeave={() => setHoveredDifficulty(null)}
-//                         className={`flex-1 cursor-pointer rounded-xl border p-3 text-center transition-all duration-200 ${form.difficulty === item.value
-//                             ? `border-${item.color}-500 bg-${item.color}-50 text-${item.color}-700`
-//                             : 'border-gray-200 bg-white text-gray-600 hover:border-blue-300 hover:bg-blue-50'
-//                           }`}
-//                       >
-//                         <span className="text-sm font-medium">{item.label}</span>
-//                         {hoveredDifficulty === item.value && (
-//                           <p className="text-xs text-gray-400 mt-1">{item.description}</p>
-//                         )}
-//                       </Motion.div>
-//                     ))}
-//                   </div>
-//                 </label>
-
-//                 <label className="space-y-2">
-//                   <span className="text-sm font-medium text-gray-700">🛠️ Tech stack</span>
-//                   <input
-//                     value={form.tech_stack}
-//                     onChange={(event) => setForm((previous) => ({ ...previous, tech_stack: event.target.value }))}
-//                     placeholder="React, Python, Java, AWS (comma separated)"
-//                     className="w-full rounded-xl border border-gray-200 px-4 py-3 text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
-//                   />
-//                 </label>
-
-//                 <label className="space-y-2">
-//                   <span className="text-sm font-medium text-gray-700">🏢 Target companies</span>
-//                   <input
-//                     value={form.target_companies}
-//                     onChange={(event) => setForm((previous) => ({ ...previous, target_companies: event.target.value }))}
-//                     placeholder="Google, Microsoft, Amazon, TCS (comma separated)"
-//                     className="w-full rounded-xl border border-gray-200 px-4 py-3 text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
-//                   />
-//                 </label>
-
-//                 <label className="space-y-2 md:col-span-2">
-//                   <span className="text-sm font-medium text-gray-700">📄 Resume summary (optional)</span>
-//                   <textarea
-//                     rows={3}
-//                     value={form.resume_text}
-//                     onChange={(event) => setForm((previous) => ({ ...previous, resume_text: event.target.value }))}
-//                     placeholder="Paste a short summary of your experience, skills, and projects to help personalize the session..."
-//                     className="w-full rounded-xl border border-gray-200 px-4 py-3 text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all resize-none"
-//                   />
-//                   <p className="text-xs text-gray-400">This helps AI generate more relevant questions for your background</p>
-//                 </label>
-//               </div>
-
-//               {error && (
-//                 <Motion.div
-//                   initial={{ opacity: 0, y: -10 }}
-//                   animate={{ opacity: 1, y: 0 }}
-//                   className="mt-4 rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-700"
-//                 >
-//                   {error}
-//                 </Motion.div>
-//               )}
-
-//               <Button onClick={handleStartInterview} className="mt-6 w-full cursor-pointer justify-center py-3.5 text-base">
-//                 🚀 Start interview
-//               </Button>
-//             </Motion.div>
-//           </div>
-//         )}
-
-//         {/* Live Interview Stage */}
-//         {stage === 'live' && session && question && (
-//           <div className="grid gap-6 xl:grid-cols-[0.88fr_1.12fr]">
-
-//             {/* Left Sidebar */}
-//             <Motion.div
-//               initial={{ opacity: 0, x: -20 }}
-//               animate={{ opacity: 1, x: 0 }}
-//               className="space-y-6"
-//             >
-//               <div className="rounded-2xl bg-gradient-to-br from-blue-800 via-blue-700 to-blue-600 p-6 text-white shadow-xl shadow-blue-500/30">
-//                 <p className="text-xs uppercase tracking-[0.24em] text-blue-100">📋 Session</p>
-//                 <h2 className="mt-3 text-2xl font-bold">{session.job_role}</h2>
-//                 <div className="mt-4 flex flex-wrap gap-2 text-sm">
-//                   <span className="rounded-full bg-white/20 px-3 py-1 capitalize">{session.interview_type}</span>
-//                   <span className="rounded-full bg-white/20 px-3 py-1 capitalize">{session.difficulty}</span>
-//                   <span className="rounded-full bg-white/20 px-3 py-1">{session.total_questions} questions</span>
-//                 </div>
-//               </div>
-
-//               <div className="rounded-2xl border border-blue-200 bg-white p-6 shadow-lg shadow-blue-200/50">
-//                 <p className="text-sm text-gray-500">⏱️ Elapsed answer time</p>
-//                 <p className="mt-2 text-5xl font-bold text-blue-600">{formattedTime}</p>
-//                 <div className="mt-4 h-2 w-full rounded-full bg-gray-100">
-//                   <Motion.div
-//                     initial={{ width: 0 }}
-//                     animate={{ width: `${(timer / 300) * 100}%` }}
-//                     className="h-full rounded-full bg-gradient-to-r from-blue-500 to-blue-600"
-//                   />
-//                 </div>
-//                 <p className="mt-4 text-sm leading-6 text-gray-500">
-//                   🎙️ Voice input is coming soon! Type your answer below for now.
-//                 </p>
-//               </div>
-
-//               {/* Progress Indicator */}
-//               <div className="rounded-2xl border border-blue-200 bg-white p-6 shadow-lg shadow-blue-200/50">
-//                 <p className="text-sm font-semibold text-gray-700">📊 Session Progress</p>
-//                 <div className="mt-3 flex items-center gap-2">
-//                   <div className="flex-1 h-2 rounded-full bg-gray-100">
-//                     <div className="w-1/3 h-full rounded-full bg-blue-600" />
-//                   </div>
-//                   <span className="text-sm text-gray-500">Question 1/{session.total_questions}</span>
-//                 </div>
-//               </div>
-
-//               {/* Answer Tips */}
-//               <div className="rounded-2xl border border-blue-200 bg-blue-50/30 p-6 shadow-sm">
-//                 <p className="text-sm font-semibold text-blue-700">📝 Answer Tips</p>
-//                 <ul className="mt-2 space-y-1 text-xs text-gray-600">
-//                   <li>• Use specific examples from your experience</li>
-//                   <li>• Structure your answer clearly</li>
-//                   <li>• Be honest and authentic</li>
-//                 </ul>
-//               </div>
-//             </Motion.div>
-
-//             {/* Right Section - Question & Answer */}
-//             <div className="space-y-6">
-//               <Motion.div
-//                 initial={{ opacity: 0, y: 20 }}
-//                 animate={{ opacity: 1, y: 0 }}
-//                 className="rounded-2xl border border-blue-200 bg-white p-7 shadow-lg shadow-blue-200/50"
-//               >
-//                 <div className="flex items-center justify-between gap-4">
-//                   <div>
-//                     <p className="text-sm font-semibold uppercase tracking-[0.24em] text-blue-600">
-//                       🤖 AI interviewer
-//                     </p>
-//                     <h1 className="mt-2 text-3xl font-bold tracking-tight text-gray-900">
-//                       Current question
-//                     </h1>
-//                   </div>
-//                   <div className="rounded-full bg-blue-100 px-4 py-2 text-sm font-semibold text-blue-700">
-//                     {question.topic || 'Live round'}
-//                   </div>
-//                 </div>
-//                 <div className="mt-6 rounded-xl bg-gray-50 p-6 border border-gray-200">
-//                   <p className="text-lg leading-8 text-gray-800">{question.question_text}</p>
-//                 </div>
-//               </Motion.div>
-
-//               <Motion.div
-//                 initial={{ opacity: 0, y: 20 }}
-//                 animate={{ opacity: 1, y: 0 }}
-//                 transition={{ delay: 0.1 }}
-//                 className="rounded-2xl border border-blue-200 bg-white p-7 shadow-lg shadow-blue-200/50"
-//               >
-//                 <div className="flex items-center justify-between gap-4">
-//                   <div>
-//                     <h2 className="text-xl font-bold text-gray-900">✍️ Your answer</h2>
-//                     <p className="mt-1 text-sm text-gray-500">Type naturally or use the voice CTA as a guided input surface.</p>
-//                   </div>
-//                   <span className="rounded-full bg-blue-100 px-4 py-2 text-sm font-medium text-blue-700">
-//                     {answer.trim() ? `${answer.trim().split(/\s+/).length} words` : '0 words'}
-//                   </span>
-//                 </div>
-
-//                 <textarea
-//                   rows={10}
-//                   value={answer}
-//                   onChange={(event) => setAnswer(event.target.value)}
-//                   placeholder="Structure your answer with examples, context, actions, and outcomes..."
-//                   className="mt-5 w-full rounded-xl border border-gray-200 px-5 py-4 text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all resize-none"
-//                 />
-
-//                 {error && (
-//                   <Motion.div
-//                     initial={{ opacity: 0, y: -10 }}
-//                     animate={{ opacity: 1, y: 0 }}
-//                     className="mt-4 rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-700"
-//                   >
-//                     {error}
-//                   </Motion.div>
-//                 )}
-
-//                 <div className="mt-5 flex flex-col gap-3 sm:flex-row">
-//                   <Button onClick={handleSubmit} className="flex-1 cursor-pointer justify-center py-3.5" disabled={loading}>
-//                     {loading ? '⏳ Submitting...' : '✨ Submit for AI feedback'}
-//                   </Button>
-//                   <Button variant="secondary" onClick={() => setAnswer('')} className="flex-1 justify-center cursor-pointer py-3.5">
-//                     🗑️ Clear answer
-//                   </Button>
-//                 </div>
-//               </Motion.div>
-//             </div>
-//           </div>
-//         )}
-//       </div>
-//     </Motion.div>
-//   )
-// }
-
-// export default Interview
-
+import { AnimatePresence, motion } from 'framer-motion'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { motion as Motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import Button from '../components/common/Button'
 import Loader from '../components/common/Loader'
+import PageTransition from '../components/common/PageTransition'
+import { useToast } from '../components/common/ToastProvider'
 import { startInterview, submitAnswer } from '../utils/api'
 
 const interviewTypes = [
-  { value: 'technical', label: 'Technical', icon: '💻', description: 'Coding, algorithms, system design' },
-  { value: 'behavioral', label: 'Behavioral', icon: '🗣️', description: 'Past experiences, teamwork, leadership' },
-  { value: 'hr', label: 'HR', icon: '👥', description: 'Company fit, career goals' },
-  { value: 'domain_specific', label: 'Domain specific', icon: '🎯', description: 'Industry-specific knowledge' },
+  { value: 'technical', label: 'Technical', description: 'Coding, systems, technical depth' },
+  { value: 'behavioral', label: 'Behavioral', description: 'Stories, teamwork, leadership' },
+  { value: 'hr', label: 'HR', description: 'Fit, motivation, communication' },
+  { value: 'domain_specific', label: 'Domain specific', description: 'Industry and role context' },
 ]
 
 const difficultyOptions = [
-  { value: 'beginner', label: 'Beginner', color: 'emerald', description: 'Basic concepts' },
-  { value: 'intermediate', label: 'Intermediate', color: 'blue', description: 'Practical scenarios' },
-  { value: 'advanced', label: 'Advanced', color: 'purple', description: 'Complex problems' },
+  { value: 'beginner', label: 'Beginner', description: 'Foundational questions' },
+  { value: 'intermediate', label: 'Intermediate', description: 'Practical scenario prompts' },
+  { value: 'advanced', label: 'Advanced', description: 'Complex, high-pressure prompts' },
 ]
 
 function Interview() {
   const navigate = useNavigate()
+  const { pushToast } = useToast()
   const [stage, setStage] = useState('setup')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -525,9 +30,7 @@ function Interview() {
   const [session, setSession] = useState(null)
   const [question, setQuestion] = useState(null)
   const [answer, setAnswer] = useState('')
-  const [hoveredType, setHoveredType] = useState(null)
-  const [hoveredDifficulty, setHoveredDifficulty] = useState(null)
-  // ✅ Track current question number
+  const [wordPulse, setWordPulse] = useState(false)
   const [currentQuestionNumber, setCurrentQuestionNumber] = useState(1)
   const [form, setForm] = useState({
     user_id: 'student_demo',
@@ -541,16 +44,31 @@ function Interview() {
   const timerRef = useRef(null)
 
   useEffect(() => {
-    if (stage === 'live') {
-      timerRef.current = window.setInterval(() => setTimer((previous) => previous + 1), 1000)
-    }
+    document.title = 'Interview Practice | HiLearn AI Mock Interview'
+  }, [])
 
+  useEffect(() => {
+    if (stage === 'live') {
+      timerRef.current = window.setInterval(() => setTimer((prev) => prev + 1), 1000)
+    }
     return () => {
-      if (timerRef.current) {
-        window.clearInterval(timerRef.current)
-      }
+      if (timerRef.current) window.clearInterval(timerRef.current)
     }
   }, [stage, question?.question_id])
+
+  const wordCount = useMemo(() => {
+    const trimmed = answer.trim()
+    return trimmed ? trimmed.split(/\s+/).length : 0
+  }, [answer])
+
+  useEffect(() => {
+    if (wordCount > 0 && wordCount % 50 === 0) {
+      setWordPulse(true)
+      const timeout = window.setTimeout(() => setWordPulse(false), 450)
+      return () => window.clearTimeout(timeout)
+    }
+    return undefined
+  }, [wordCount])
 
   const formattedTime = useMemo(() => {
     const minutes = String(Math.floor(timer / 60)).padStart(2, '0')
@@ -558,7 +76,6 @@ function Interview() {
     return `${minutes}:${seconds}`
   }, [timer])
 
-  // ✅ Progress percentage calculate karo
   const progressPercent = useMemo(() => {
     if (!session?.total_questions) return 0
     return Math.min((currentQuestionNumber / session.total_questions) * 100, 100)
@@ -566,10 +83,9 @@ function Interview() {
 
   const handleStartInterview = async () => {
     if (!form.job_role.trim()) {
-      setError('✨ Add your target job role to start the interview.')
+      setError('Add your target job role to start the interview.')
       return
     }
-
     setLoading(true)
     setError('')
     try {
@@ -579,14 +95,17 @@ function Interview() {
         target_companies: form.target_companies ? form.target_companies.split(',').map((item) => item.trim()).filter(Boolean) : undefined,
         resume_text: form.resume_text || undefined,
       }
-
       const response = await startInterview(payload)
       setSession(response)
       setQuestion(response.first_question)
       setStage('live')
       setTimer(0)
-      setCurrentQuestionNumber(1) // ✅ Reset to 1 on new interview
+      setCurrentQuestionNumber(1)
       window.localStorage.setItem('hilearn_session_id', response.session_id)
+      pushToast({
+        title: 'Interview room is live',
+        description: 'Your first question is ready.',
+      })
     } catch (requestError) {
       setError(requestError.message)
     } finally {
@@ -596,10 +115,9 @@ function Interview() {
 
   const handleSubmit = async () => {
     if (!answer.trim() || !session || !question) {
-      setError('✍️ Write your answer before sending it for feedback.')
+      setError('Write your answer before sending it for feedback.')
       return
     }
-
     setLoading(true)
     setError('')
     try {
@@ -609,23 +127,23 @@ function Interview() {
         answer_text: answer,
         answer_duration_seconds: timer,
       })
-
       window.localStorage.setItem('hilearn_latest_score', String(response.feedback.overall_score))
       window.localStorage.setItem('hilearn_feedback', JSON.stringify(response))
 
+      pushToast({
+        title: 'Answer submitted',
+        description: 'Feedback was saved and your progress is updated.',
+      })
+
       if (response.next_question) {
-        // ✅ Next question dikhao aur counter badao
         setQuestion(response.next_question)
         setAnswer('')
         setTimer(0)
         setCurrentQuestionNumber((prev) => prev + 1)
         if (timerRef.current) window.clearInterval(timerRef.current)
       } else {
-        // ✅ Sab questions ho gaye — feedback pe jao
         if (timerRef.current) window.clearInterval(timerRef.current)
-        navigate('/feedback', {
-          state: { feedbackResponse: response, session },
-        })
+        navigate('/feedback', { state: { feedbackResponse: response, session } })
       }
     } catch (requestError) {
       setError(requestError.message)
@@ -635,382 +153,298 @@ function Interview() {
   }
 
   if (loading && stage === 'setup') {
-    return <Loader label="🎯 Starting your interview room..." />
+    return <Loader label="Starting your interview room..." />
   }
 
   return (
-    <Motion.div
-      initial={{ opacity: 0, y: 14 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="min-h-screen bg-gray-100 py-14 px-4"
-    >
-      <div className="max-w-7xl mx-auto">
-
+    <PageTransition>
+      <section className="section-shell">
         {stage === 'setup' && (
-          <div className="grid gap-8 xl:grid-cols-[0.92fr_1.08fr]">
+          <div className="grid gap-8 xl:grid-cols-[0.95fr_1.05fr]">
+            <motion.div initial={{ opacity: 0, x: -24 }} animate={{ opacity: 1, x: 0 }} className="space-y-6">
+              <div className="navy-panel relative overflow-hidden rounded-[32px] p-8">
+                <motion.div
+                  animate={{ scale: [1, 1.1, 1], opacity: [0.3, 0.5, 0.3] }}
+                  transition={{ duration: 6, repeat: Infinity }}
+                  className="ambient-blob -left-10 top-0 h-44 w-44 bg-[#c8601a]/30"
+                />
+                <div className="relative">
+                  <p className="text-sm uppercase tracking-[0.24em] text-white/55">Interview setup</p>
+                  <h1 className="display-font mt-3 text-5xl font-bold text-white">Step into a focused practice room.</h1>
+                  <p className="mt-4 text-lg leading-8 text-white/70">
+                    Choose interview type, role, and difficulty. The API flow and state logic stay exactly as they are while the room becomes visually richer.
+                  </p>
+                  <div className="mt-6 space-y-3 text-sm text-white/76">
+                    {[
+                      'Backend-connected session launch',
+                      'Live answer submission and scoring',
+                      'Lightweight local storage for continuity',
+                    ].map((item) => (
+                      <div key={item} className="rounded-2xl border border-white/12 bg-white/8 px-4 py-3">
+                        {item}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
 
-            {/* Left Section - Info */}
-            <div className="space-y-6">
-              <Motion.div
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.5 }}
-                className="rounded-2xl bg-gradient-to-br from-blue-800 via-blue-700 to-blue-600 p-8 text-white shadow-xl shadow-blue-500/30"
-              >
-                <p className="text-sm font-semibold uppercase tracking-[0.24em] text-blue-100">
-                  🎙️ Interview lab
-                </p>
-                <h1 className="mt-3 text-4xl font-bold tracking-tight">
-                  Step into a calm, realistic practice room.
-                </h1>
-                <p className="mt-4 max-w-xl text-base leading-7 text-blue-100">
-                  Choose your interview type, role, and difficulty, then launch a backend-connected session with the first live AI question.
-                </p>
-                <div className="mt-6 grid gap-3 sm:grid-cols-3">
+              <div className="surface-card px-6 py-7">
+                <p className="text-sm uppercase tracking-[0.22em] text-[#c8601a]">Session benefits</p>
+                <div className="mt-5 grid gap-3">
                   {[
-                    { emoji: '🎯', text: 'Role setup' },
-                    { emoji: '💬', text: 'Live question flow' },
-                    { emoji: '📊', text: 'Feedback after each answer' },
+                    'Warm-focus setup that lowers friction before a session',
+                    'Animated selection cards for interview type and difficulty',
+                    'Clean field treatment with subtle amber focus states',
                   ].map((item) => (
-                    <div key={item.text} className="rounded-xl bg-white/15 px-4 py-3 text-sm font-medium text-white backdrop-blur-sm">
-                      {item.emoji} {item.text}
+                    <div key={item} className="rounded-2xl border border-[#e0dbd3] bg-[#fffaf4] px-4 py-4 text-sm text-[#5c5a57]">
+                      {item}
                     </div>
                   ))}
                 </div>
-              </Motion.div>
+              </div>
+            </motion.div>
 
-              <Motion.div
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.1, duration: 0.5 }}
-                className="rounded-2xl border border-blue-200 bg-white p-6 shadow-lg shadow-blue-200/50"
-              >
-                <p className="text-sm font-semibold text-gray-900">🔌 What this setup connects to</p>
-                <div className="mt-4 space-y-3">
-                  {[
-                    'Starts real interview sessions from FastAPI',
-                    'Submits typed answers to the existing feedback endpoint',
-                    'Stores only lightweight session context in localStorage',
-                  ].map((item, idx) => (
-                    <Motion.div
-                      key={item}
-                      initial={{ opacity: 0, x: -10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: 0.2 + idx * 0.1 }}
-                      className="flex items-center gap-3 text-sm text-gray-600"
-                    >
-                      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-100 text-blue-600 text-xs">✓</span>
-                      <span>{item}</span>
-                    </Motion.div>
-                  ))}
-                </div>
-              </Motion.div>
-
-              <Motion.div
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.2, duration: 0.5 }}
-                className="rounded-2xl bg-gradient-to-r from-blue-50 to-white p-6 border border-blue-200"
-              >
-                <p className="text-sm font-semibold text-blue-600">💡 Pro Tips for Success</p>
-                <div className="mt-3 space-y-2">
-                  <p className="text-sm text-gray-600">• Be specific with your tech stack and target companies</p>
-                  <p className="text-sm text-gray-600">• Use STAR method (Situation, Task, Action, Result)</p>
-                  <p className="text-sm text-gray-600">• Practice speaking clearly and concisely</p>
-                </div>
-              </Motion.div>
-
-              <Motion.div
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.25, duration: 0.5 }}
-                className="rounded-2xl bg-white p-6 border border-blue-200 shadow-md"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="text-center flex-1">
-                    <p className="text-2xl font-bold text-blue-600">10K+</p>
-                    <p className="text-xs text-gray-500">Interviews Completed</p>
-                  </div>
-                  <div className="w-px h-8 bg-gray-200" />
-                  <div className="text-center flex-1">
-                    <p className="text-2xl font-bold text-blue-600">92%</p>
-                    <p className="text-xs text-gray-500">Confidence Boost</p>
-                  </div>
-                  <div className="w-px h-8 bg-gray-200" />
-                  <div className="text-center flex-1">
-                    <p className="text-2xl font-bold text-blue-600">4.9</p>
-                    <p className="text-xs text-gray-500">Student Rating</p>
-                  </div>
-                </div>
-              </Motion.div>
-            </div>
-
-            {/* Right Section - Form */}
-            <Motion.div
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.5 }}
-              className="rounded-2xl border border-blue-200 bg-white p-8 shadow-xl shadow-blue-200/50"
-            >
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">🎮 Interview Setup</h2>
-              <p className="text-sm text-gray-500 mb-6">Fill in the details to get personalized questions</p>
+            <motion.div initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} className="surface-card px-6 py-8 md:px-8">
+              <div className="mb-6">
+                <p className="text-sm uppercase tracking-[0.22em] text-[#c8601a]">Configuration</p>
+                <h2 className="display-font mt-3 text-4xl font-bold text-[#0f1f3d]">Build your interview room.</h2>
+              </div>
 
               <div className="grid gap-5 md:grid-cols-2">
                 <label className="space-y-2 md:col-span-2">
-                  <span className="text-sm font-medium text-gray-700">🎯 Target role <span className="text-red-500">*</span></span>
+                  <span className="text-sm font-medium text-[#5c5a57]">Target role</span>
                   <input
                     value={form.job_role}
-                    onChange={(event) => setForm((previous) => ({ ...previous, job_role: event.target.value }))}
-                    placeholder="e.g., Frontend Developer, Data Analyst, SDE Intern"
-                    className="w-full rounded-xl border border-gray-200 px-4 py-3 text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
+                    onChange={(event) => setForm((prev) => ({ ...prev, job_role: event.target.value }))}
+                    placeholder="Frontend Developer, Data Analyst, SDE Intern"
+                    className="warm-input"
                   />
                 </label>
 
-                <label className="space-y-2">
-                  <span className="text-sm font-medium text-gray-700">📋 Interview type</span>
-                  <div className="grid grid-cols-2 gap-2">
-                    {interviewTypes.map((item) => (
-                      <Motion.div
-                        key={item.value}
-                        whileHover={{ scale: 1.02 }}
-                        onClick={() => setForm((prev) => ({ ...prev, interview_type: item.value }))}
-                        onMouseEnter={() => setHoveredType(item.value)}
-                        onMouseLeave={() => setHoveredType(null)}
-                        className={`cursor-pointer rounded-xl border p-3 text-center transition-all duration-200 ${form.interview_type === item.value
-                          ? 'border-blue-500 bg-blue-50 text-blue-700'
-                          : 'border-gray-200 bg-white text-gray-600 hover:border-blue-300 hover:bg-blue-50'
-                          }`}
-                      >
-                        <span className="text-xl block mb-1">{item.icon}</span>
-                        <span className="text-sm font-medium">{item.label}</span>
-                        {hoveredType === item.value && (
-                          <p className="text-xs text-gray-400 mt-1">{item.description}</p>
-                        )}
-                      </Motion.div>
-                    ))}
+                <div className="space-y-3 md:col-span-2">
+                  <span className="text-sm font-medium text-[#5c5a57]">Interview type</span>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {interviewTypes.map((item) => {
+                      const selected = form.interview_type === item.value
+                      return (
+                        <motion.button
+                          key={item.value}
+                          type="button"
+                          whileTap={{ scale: 0.95 }}
+                          onClick={() => setForm((prev) => ({ ...prev, interview_type: item.value }))}
+                          className={`relative rounded-[24px] border px-4 py-5 text-left transition ${selected ? 'border-[#c8601a] bg-[#fff4ea]' : 'border-[#e0dbd3] bg-white'}`}
+                        >
+                          {selected && (
+                            <motion.span
+                              initial={{ opacity: 0, scale: 0.6 }}
+                              animate={{ opacity: 1, scale: 1 }}
+                              className="absolute right-4 top-4 flex h-6 w-6 items-center justify-center rounded-full bg-[#c8601a] text-xs text-white"
+                            >
+                              ✓
+                            </motion.span>
+                          )}
+                          <p className="text-lg font-semibold text-[#0f1f3d]">{item.label}</p>
+                          <p className="mt-2 text-sm text-[#5c5a57]">{item.description}</p>
+                        </motion.button>
+                      )
+                    })}
                   </div>
-                </label>
+                </div>
+
+                <div className="space-y-3 md:col-span-2">
+                  <span className="text-sm font-medium text-[#5c5a57]">Difficulty</span>
+                  <div className="flex flex-wrap gap-3">
+                    {difficultyOptions.map((item) => {
+                      const selected = form.difficulty === item.value
+                      return (
+                        <motion.button
+                          key={item.value}
+                          type="button"
+                          whileTap={{ scale: 0.95 }}
+                          transition={{ type: 'spring', stiffness: 260, damping: 18 }}
+                          onClick={() => setForm((prev) => ({ ...prev, difficulty: item.value }))}
+                          className={`rounded-full border px-5 py-3 text-sm font-medium transition ${selected ? 'border-[#c8601a] bg-[#fff4ea] text-[#c8601a]' : 'border-[#e0dbd3] bg-white text-[#5c5a57]'}`}
+                        >
+                          {item.label}
+                        </motion.button>
+                      )
+                    })}
+                  </div>
+                </div>
 
                 <label className="space-y-2">
-                  <span className="text-sm font-medium text-gray-700">⚡ Difficulty</span>
-                  <div className="flex gap-2">
-                    {difficultyOptions.map((item) => (
-                      <Motion.div
-                        key={item.value}
-                        whileHover={{ scale: 1.02 }}
-                        onClick={() => setForm((prev) => ({ ...prev, difficulty: item.value }))}
-                        onMouseEnter={() => setHoveredDifficulty(item.value)}
-                        onMouseLeave={() => setHoveredDifficulty(null)}
-                        className={`flex-1 cursor-pointer rounded-xl border p-3 text-center transition-all duration-200 ${form.difficulty === item.value
-                          ? `border-${item.color}-500 bg-${item.color}-50 text-${item.color}-700`
-                          : 'border-gray-200 bg-white text-gray-600 hover:border-blue-300 hover:bg-blue-50'
-                          }`}
-                      >
-                        <span className="text-sm font-medium">{item.label}</span>
-                        {hoveredDifficulty === item.value && (
-                          <p className="text-xs text-gray-400 mt-1">{item.description}</p>
-                        )}
-                      </Motion.div>
-                    ))}
-                  </div>
-                </label>
-
-                <label className="space-y-2">
-                  <span className="text-sm font-medium text-gray-700">🛠️ Tech stack</span>
+                  <span className="text-sm font-medium text-[#5c5a57]">Tech stack</span>
                   <input
                     value={form.tech_stack}
-                    onChange={(event) => setForm((previous) => ({ ...previous, tech_stack: event.target.value }))}
-                    placeholder="React, Python, Java, AWS (comma separated)"
-                    className="w-full rounded-xl border border-gray-200 px-4 py-3 text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
+                    onChange={(event) => setForm((prev) => ({ ...prev, tech_stack: event.target.value }))}
+                    placeholder="React, Python, Java"
+                    className="warm-input"
                   />
                 </label>
-
                 <label className="space-y-2">
-                  <span className="text-sm font-medium text-gray-700">🏢 Target companies</span>
+                  <span className="text-sm font-medium text-[#5c5a57]">Target companies</span>
                   <input
                     value={form.target_companies}
-                    onChange={(event) => setForm((previous) => ({ ...previous, target_companies: event.target.value }))}
-                    placeholder="Google, Microsoft, Amazon, TCS (comma separated)"
-                    className="w-full rounded-xl border border-gray-200 px-4 py-3 text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
+                    onChange={(event) => setForm((prev) => ({ ...prev, target_companies: event.target.value }))}
+                    placeholder="Google, TCS, Amazon"
+                    className="warm-input"
                   />
                 </label>
-
                 <label className="space-y-2 md:col-span-2">
-                  <span className="text-sm font-medium text-gray-700">📄 Resume summary (optional)</span>
+                  <span className="text-sm font-medium text-[#5c5a57]">Resume summary</span>
                   <textarea
-                    rows={3}
+                    rows={4}
                     value={form.resume_text}
-                    onChange={(event) => setForm((previous) => ({ ...previous, resume_text: event.target.value }))}
-                    placeholder="Paste a short summary of your experience, skills, and projects to help personalize the session..."
-                    className="w-full rounded-xl border border-gray-200 px-4 py-3 text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all resize-none"
+                    onChange={(event) => setForm((prev) => ({ ...prev, resume_text: event.target.value }))}
+                    placeholder="Paste a short summary to personalize the session..."
+                    className="warm-input resize-none"
                   />
-                  <p className="text-xs text-gray-400">This helps AI generate more relevant questions for your background</p>
                 </label>
               </div>
 
-              {error && (
-                <Motion.div
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="mt-4 rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-700"
-                >
-                  {error}
-                </Motion.div>
-              )}
+              <AnimatePresence>
+                {error && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="mt-5 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700"
+                  >
+                    {error}
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
-              <Button onClick={handleStartInterview} className="mt-6 w-full cursor-pointer justify-center py-3.5 text-base">
-                🚀 Start interview
+              <Button onClick={handleStartInterview} className="mt-6 w-full justify-center py-4 text-base">
+                Start interview <motion.span whileHover={{ x: 4 }}>→</motion.span>
               </Button>
-            </Motion.div>
+            </motion.div>
           </div>
         )}
 
-        {/* Live Interview Stage */}
         {stage === 'live' && session && question && (
-          <div className="grid gap-6 xl:grid-cols-[0.88fr_1.12fr]">
-
-            {/* Left Sidebar */}
-            <Motion.div
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              className="space-y-6"
-            >
-              <div className="rounded-2xl bg-gradient-to-br from-blue-800 via-blue-700 to-blue-600 p-6 text-white shadow-xl shadow-blue-500/30">
-                <p className="text-xs uppercase tracking-[0.24em] text-blue-100">📋 Session</p>
-                <h2 className="mt-3 text-2xl font-bold">{session.job_role}</h2>
-                <div className="mt-4 flex flex-wrap gap-2 text-sm">
-                  <span className="rounded-full bg-white/20 px-3 py-1 capitalize">{session.interview_type}</span>
-                  <span className="rounded-full bg-white/20 px-3 py-1 capitalize">{session.difficulty}</span>
-                  <span className="rounded-full bg-white/20 px-3 py-1">{session.total_questions} questions</span>
+          <div className="grid gap-8 xl:grid-cols-[0.9fr_1.1fr]">
+            <motion.div initial={{ opacity: 0, x: -24 }} animate={{ opacity: 1, x: 0 }} className="space-y-6">
+              <div className="navy-panel rounded-[32px] p-7">
+                <p className="text-sm uppercase tracking-[0.24em] text-white/55">Session</p>
+                <h2 className="display-font mt-3 text-4xl font-bold text-white">{session.job_role}</h2>
+                <div className="mt-5 flex flex-wrap gap-2 text-sm text-white/78">
+                  <span className="rounded-full bg-white/10 px-3 py-2 capitalize">{session.interview_type}</span>
+                  <span className="rounded-full bg-white/10 px-3 py-2 capitalize">{session.difficulty}</span>
+                  <span className="rounded-full bg-white/10 px-3 py-2">{session.total_questions} questions</span>
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-blue-200 bg-white p-6 shadow-lg shadow-blue-200/50">
-                <p className="text-sm text-gray-500">⏱️ Elapsed answer time</p>
-                <p className="mt-2 text-5xl font-bold text-blue-600">{formattedTime}</p>
-                <div className="mt-4 h-2 w-full rounded-full bg-gray-100">
-                  <Motion.div
+              <div className="surface-card px-6 py-7">
+                <p className="text-sm uppercase tracking-[0.22em] text-[#9c9a96]">Elapsed time</p>
+                <motion.p
+                  animate={timer >= 270 ? { scale: [1, 1.03, 1], color: ['#c8601a', '#ae5317', '#c8601a'] } : {}}
+                  transition={{ duration: 0.8, repeat: Infinity }}
+                  className="mt-3 display-font text-5xl font-bold text-[#0f1f3d]"
+                >
+                  {formattedTime}
+                </motion.p>
+                <div className="mt-4 h-3 rounded-full bg-[#f0ebe3]">
+                  <motion.div
                     initial={{ width: 0 }}
-                    animate={{ width: `${(timer / 300) * 100}%` }}
-                    className="h-full rounded-full bg-gradient-to-r from-blue-500 to-blue-600"
+                    animate={{ width: `${Math.min((timer / 300) * 100, 100)}%` }}
+                    className="h-3 rounded-full bg-[#c8601a]"
                   />
                 </div>
-                <p className="mt-4 text-sm leading-6 text-gray-500">
-                  🎙️ Voice input is coming soon! Type your answer below for now.
-                </p>
+                <p className="mt-3 text-sm text-[#5c5a57]">The timer pulses amber when you dip under 30 seconds of the five-minute pacing window.</p>
               </div>
 
-              {/* ✅ Progress Indicator - Ab sahi se update hoga */}
-              <div className="rounded-2xl border border-blue-200 bg-white p-6 shadow-lg shadow-blue-200/50">
-                <p className="text-sm font-semibold text-gray-700">📊 Session Progress</p>
-                <div className="mt-3 flex items-center gap-2">
-                  <div className="flex-1 h-2 rounded-full bg-gray-100">
-                    <Motion.div
-                      animate={{ width: `${progressPercent}%` }}
-                      transition={{ duration: 0.5 }}
-                      className="h-full rounded-full bg-blue-600"
-                    />
-                  </div>
-                  <span className="text-sm text-gray-500 whitespace-nowrap">
-                    Question {currentQuestionNumber}/{session.total_questions}
-                  </span>
+              <div className="surface-card px-6 py-7">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm uppercase tracking-[0.22em] text-[#9c9a96]">Progress</p>
+                  <span className="text-sm text-[#5c5a57]">Question {currentQuestionNumber}/{session.total_questions}</span>
                 </div>
-                {/* ✅ Completed dots */}
-                <div className="mt-3 flex gap-1">
-                  {Array.from({ length: session.total_questions }).map((_, idx) => (
-                    <div
-                      key={idx}
-                      className={`h-2 flex-1 rounded-full transition-all duration-300 ${idx < currentQuestionNumber ? 'bg-blue-500' : 'bg-gray-200'}`}
+                <div className="mt-4 h-3 rounded-full bg-[#f0ebe3]">
+                  <motion.div animate={{ width: `${progressPercent}%` }} transition={{ duration: 0.5 }} className="h-3 rounded-full bg-[#0f1f3d]" />
+                </div>
+                <div className="mt-4 flex gap-2">
+                  {Array.from({ length: session.total_questions }).map((_, index) => (
+                    <motion.div
+                      key={index}
+                      initial={{ scaleX: 0 }}
+                      animate={{ scaleX: index < currentQuestionNumber ? 1 : 0.25 }}
+                      style={{ transformOrigin: 'left' }}
+                      className={`h-2 flex-1 rounded-full ${index < currentQuestionNumber ? 'bg-[#c8601a]' : 'bg-[#e0dbd3]'}`}
                     />
                   ))}
                 </div>
               </div>
+            </motion.div>
 
-              {/* Answer Tips */}
-              <div className="rounded-2xl border border-blue-200 bg-blue-50/30 p-6 shadow-sm">
-                <p className="text-sm font-semibold text-blue-700">📝 Answer Tips</p>
-                <ul className="mt-2 space-y-1 text-xs text-gray-600">
-                  <li>• Use specific examples from your experience</li>
-                  <li>• Structure your answer clearly</li>
-                  <li>• Be honest and authentic</li>
-                </ul>
-              </div>
-            </Motion.div>
-
-            {/* Right Section - Question & Answer */}
             <div className="space-y-6">
-              <Motion.div
+              <motion.div
                 key={question.question_id}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="rounded-2xl border border-blue-200 bg-white p-7 shadow-lg shadow-blue-200/50"
+                className="surface-card px-6 py-8"
               >
                 <div className="flex items-center justify-between gap-4">
                   <div>
-                    <p className="text-sm font-semibold uppercase tracking-[0.24em] text-blue-600">
-                      🤖 AI interviewer
-                    </p>
-                    <h1 className="mt-2 text-3xl font-bold tracking-tight text-gray-900">
-                      Question {currentQuestionNumber}
-                    </h1>
+                    <p className="text-sm uppercase tracking-[0.24em] text-[#c8601a]">AI interviewer</p>
+                    <h1 className="display-font mt-3 text-4xl font-bold text-[#0f1f3d]">Question {currentQuestionNumber}</h1>
                   </div>
-                  <div className="rounded-full bg-blue-100 px-4 py-2 text-sm font-semibold text-blue-700">
+                  <span className="rounded-full bg-[#fff4ea] px-4 py-2 text-sm font-medium text-[#c8601a]">
                     {question.topic || 'Live round'}
-                  </div>
-                </div>
-                <div className="mt-6 rounded-xl bg-gray-50 p-6 border border-gray-200">
-                  <p className="text-lg leading-8 text-gray-800">{question.question_text}</p>
-                </div>
-              </Motion.div>
-
-              <Motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.1 }}
-                className="rounded-2xl border border-blue-200 bg-white p-7 shadow-lg shadow-blue-200/50"
-              >
-                <div className="flex items-center justify-between gap-4">
-                  <div>
-                    <h2 className="text-xl font-bold text-gray-900">✍️ Your answer</h2>
-                    <p className="mt-1 text-sm text-gray-500">Type naturally or use the voice CTA as a guided input surface.</p>
-                  </div>
-                  <span className="rounded-full bg-blue-100 px-4 py-2 text-sm font-medium text-blue-700">
-                    {answer.trim() ? `${answer.trim().split(/\s+/).length} words` : '0 words'}
                   </span>
                 </div>
+                <div className="mt-6 rounded-[28px] border border-[#e0dbd3] bg-[#fffaf4] p-6">
+                  <p className="text-lg leading-8 text-[#111827]">{question.question_text}</p>
+                </div>
+              </motion.div>
 
+              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="surface-card px-6 py-8">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <h2 className="display-font text-3xl font-bold text-[#0f1f3d]">Your answer</h2>
+                    <p className="mt-2 text-sm text-[#5c5a57]">Type naturally and keep your answer structured.</p>
+                  </div>
+                  <motion.span
+                    animate={wordPulse ? { y: [0, -6, 0] } : {}}
+                    className="rounded-full bg-[#fff4ea] px-4 py-2 text-sm font-medium text-[#c8601a]"
+                  >
+                    {wordCount} words
+                  </motion.span>
+                </div>
                 <textarea
                   rows={10}
                   value={answer}
                   onChange={(event) => setAnswer(event.target.value)}
-                  placeholder="Structure your answer with examples, context, actions, and outcomes..."
-                  className="mt-5 w-full rounded-xl border border-gray-200 px-5 py-4 text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all resize-none"
+                  placeholder="Structure your answer with context, action, and outcomes..."
+                  className="warm-input mt-5 resize-none px-5 py-4"
                 />
 
-                {error && (
-                  <Motion.div
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="mt-4 rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-700"
-                  >
-                    {error}
-                  </Motion.div>
-                )}
+                <AnimatePresence>
+                  {error && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700"
+                    >
+                      {error}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
 
                 <div className="mt-5 flex flex-col gap-3 sm:flex-row">
-                  <Button onClick={handleSubmit} className="flex-1 cursor-pointer justify-center py-3.5" disabled={loading}>
-                    {loading ? '⏳ Submitting...' : '✨ Submit for AI feedback'}
+                  <Button onClick={handleSubmit} className="flex-1 justify-center py-4" disabled={loading}>
+                    {loading ? 'Submitting...' : 'Submit for AI feedback'}
                   </Button>
-                  <Button variant="secondary" onClick={() => setAnswer('')} className="flex-1 justify-center cursor-pointer py-3.5">
-                    🗑️ Clear answer
+                  <Button variant="secondary" onClick={() => setAnswer('')} className="flex-1 justify-center py-4">
+                    Clear answer
                   </Button>
                 </div>
-              </Motion.div>
+              </motion.div>
             </div>
           </div>
         )}
-      </div>
-    </Motion.div>
+      </section>
+    </PageTransition>
   )
 }
 
