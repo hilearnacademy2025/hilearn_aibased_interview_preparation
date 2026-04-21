@@ -8,7 +8,7 @@ const router = express.Router();
 router.post('/register', async (req, res) => {
   try {
     const { name, email, password } = req.body;
-    
+
     // Check if user already exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
@@ -29,12 +29,18 @@ router.post('/register', async (req, res) => {
       { expiresIn: '7d' }
     );
 
+    // res.status(201).json({
+    //   success: true,
+    //   data: {
+    //     user: { id: user._id, name: user.name, email: user.email, role: user.role },
+    //     token
+    //   }
+    // });
     res.status(201).json({
-      success: true,
-      data: {
-        user: { id: user._id, name: user.name, email: user.email, role: user.role },
-        token
-      }
+      token,
+      user_id: user._id,
+      role: user.role,
+      email: user.email
     });
   } catch (error) {
     console.error('Registration error:', error);
@@ -49,7 +55,7 @@ router.post('/register', async (req, res) => {
 router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
-    
+
     // Find user by email
     const user = await User.findOne({ email });
     if (!user) {
@@ -75,12 +81,18 @@ router.post('/login', async (req, res) => {
       { expiresIn: '7d' }
     );
 
+    // res.status(200).json({
+    //   success: true,
+    //   data: {
+    //     user: { id: user._id, name: user.name, email: user.email, role: user.role },
+    //     token
+    //   }
+    // });
     res.status(200).json({
-      success: true,
-      data: {
-        user: { id: user._id, name: user.name, email: user.email, role: user.role },
-        token
-      }
+      token,
+      user_id: user._id,
+      role: user.role,
+      email: user.email
     });
   } catch (error) {
     console.error('Login error:', error);
@@ -104,7 +116,7 @@ router.get('/me', async (req, res) => {
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const user = await User.findById(decoded.id).select('-password');
-    
+
     if (!user) {
       return res.status(401).json({
         success: false,
@@ -112,9 +124,15 @@ router.get('/me', async (req, res) => {
       });
     }
 
+    // res.status(200).json({
+    //   success: true,
+    //   data: { user }
+    // });
     res.status(200).json({
-      success: true,
-      data: { user }
+      user_id: user._id,
+      email: user.email,
+      role: user.role,
+      name: user.name
     });
   } catch (error) {
     console.error('Get user error:', error);
@@ -123,6 +141,14 @@ router.get('/me', async (req, res) => {
       message: 'Invalid token'
     });
   }
+});
+
+// Logout user
+router.post('/logout', (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: 'Logged out successfully'
+  });
 });
 
 module.exports = router;

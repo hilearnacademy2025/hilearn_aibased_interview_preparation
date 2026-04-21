@@ -1,240 +1,19 @@
-// import { useState } from 'react'
-// import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
-// import { useAuth } from '../context/AuthContext'
-// import {
-//   LayoutDashboard, Mic, BarChart3, Settings, LogOut,
-//   Menu, X, ChevronRight, Bell, BookOpen, Users, Trophy
-// } from 'lucide-react'
-
-// const userNavItems = [
-//   {
-//     group: 'Main',
-//     items: [
-//       { icon: LayoutDashboard, label: 'Dashboard',       href: '/user' },
-//       { icon: Mic,             label: 'Mock Interview',  href: '/user/interview-setup' },
-//       { icon: BarChart3,       label: 'My Progress',     href: '/user/analytics' },
-//     ],
-//   },
-//   {
-//     group: 'Practice',
-//     items: [
-//       { icon: BookOpen,  label: 'My Interviews',  href: '/user/interviews' },
-//       { icon: Trophy,    label: 'Achievements',   href: '/user/achievements' },
-//       { icon: Users,     label: 'Peer Practice',  href: '/user/peer' },
-//     ],
-//   },
-//   {
-//     group: 'Account',
-//     items: [
-//       { icon: Settings,  label: 'Settings',  href: '/user/settings' },
-//     ],
-//   },
-// ]
-
-// function UserSidebar({ open, onClose, user }) {
-//   const location = useLocation()
-//   const { logout } = useAuth()
-//   const navigate = useNavigate()
-
-//   const handleLogout = async () => {
-//     await logout()
-//     navigate('/login')
-//   }
-
-//   const initials = user?.name
-//     ? user.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
-//     : user?.email?.[0]?.toUpperCase() || 'U'
-
-//   return (
-//     <>
-//       {/* Mobile overlay */}
-//       {open && (
-//         <button
-//           type="button"
-//           onClick={onClose}
-//           className="fixed inset-0 z-40 bg-[#0f1f3d]/60 lg:hidden"
-//           aria-label="Close sidebar"
-//         />
-//       )}
-
-//       <aside
-//         className={`
-//           fixed left-0 top-0 z-50 h-screen w-64 flex flex-col
-//           bg-[#0f1f3d] border-r border-white/10
-//           transform transition-transform duration-300
-//           ${open ? 'translate-x-0' : '-translate-x-full'}
-//           lg:translate-x-0
-//         `}
-//       >
-//         {/* Brand */}
-//         <div className="flex items-center justify-between px-5 py-5 border-b border-white/10">
-//           <div className="flex items-center gap-3">
-//             <div className="w-9 h-9 rounded-xl bg-[#c8601a] flex items-center justify-center shadow-lg shadow-[#c8601a]/30">
-//               <Mic size={16} className="text-white" />
-//             </div>
-//             <div>
-//               <p className="text-white font-bold text-sm leading-none">HiLearn</p>
-//               <p className="text-white/40 text-xs mt-0.5">Interview Prep</p>
-//             </div>
-//           </div>
-//           <button onClick={onClose} className="lg:hidden text-white/50 hover:text-white">
-//             <X size={18} />
-//           </button>
-//         </div>
-
-//         {/* User info */}
-//         <div className="mx-3 mt-4 rounded-xl bg-white/5 px-4 py-3 border border-white/8">
-//           <div className="flex items-center gap-3">
-//             <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#c8601a] to-[#0f1f3d] flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
-//               {initials}
-//             </div>
-//             <div className="min-w-0">
-//               <p className="text-white text-sm font-semibold truncate">{user?.name || 'Student'}</p>
-//               <p className="text-white/40 text-xs truncate">{user?.email || ''}</p>
-//             </div>
-//           </div>
-//         </div>
-
-//         {/* Nav */}
-//         <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-5">
-//           {userNavItems.map((group) => (
-//             <div key={group.group}>
-//               <p className="px-3 mb-2 text-[10px] font-bold uppercase tracking-[0.2em] text-white/30">
-//                 {group.group}
-//               </p>
-//               <div className="space-y-0.5">
-//                 {group.items.map((item) => {
-//                   const Icon = item.icon
-//                   const isActive = location.pathname === item.href
-//                   return (
-//                     <Link
-//                       key={item.href}
-//                       to={item.href}
-//                       onClick={onClose}
-//                       className={`
-//                         flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all
-//                         ${isActive
-//                           ? 'bg-[#c8601a] text-white shadow-md shadow-[#c8601a]/30'
-//                           : 'text-white/60 hover:text-white hover:bg-white/8'
-//                         }
-//                       `}
-//                     >
-//                       <Icon size={17} />
-//                       <span>{item.label}</span>
-//                       {isActive && <ChevronRight size={14} className="ml-auto opacity-70" />}
-//                     </Link>
-//                   )
-//                 })}
-//               </div>
-//             </div>
-//           ))}
-//         </nav>
-
-//         {/* Upgrade card */}
-//         <div className="mx-3 mb-3 rounded-xl bg-gradient-to-br from-[#c8601a]/80 to-[#0f1f3d] p-4 text-white border border-white/10">
-//           <p className="text-xs font-bold uppercase tracking-widest text-white/60">Free Plan</p>
-//           <p className="text-sm font-bold mt-1">Upgrade to Pro</p>
-//           <p className="text-xs text-white/60 mt-1">Unlimited interviews + AI feedback</p>
-//           <Link
-//             to="/pricing"
-//             className="mt-3 inline-block w-full text-center py-1.5 rounded-lg bg-white text-[#c8601a] text-xs font-bold hover:bg-white/90 transition"
-//           >
-//             Upgrade — ₹299/mo
-//           </Link>
-//         </div>
-
-//         {/* Logout */}
-//         <div className="px-3 pb-5 border-t border-white/10 pt-3">
-//           <button
-//             onClick={handleLogout}
-//             className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-all"
-//           >
-//             <LogOut size={16} />
-//             <span>Logout</span>
-//           </button>
-//         </div>
-//       </aside>
-//     </>
-//   )
-// }
-
-// function UserTopBar({ onMenuClick, user }) {
-//   const hour = new Date().getHours()
-//   const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening'
-//   const firstName = user?.name?.split(' ')[0] || 'there'
-
-//   return (
-//     <header className="h-16 bg-white/95 backdrop-blur border-b border-[#e0dbd3] flex items-center justify-between px-4 lg:px-8 sticky top-0 z-30">
-//       <div className="flex items-center gap-4">
-//         <button
-//           onClick={onMenuClick}
-//           className="lg:hidden p-2 rounded-xl hover:bg-[#f4f2ee] transition text-[#0f1f3d]"
-//         >
-//           <Menu size={22} />
-//         </button>
-//         <p className="hidden sm:block text-sm text-[#5c5a57]">
-//           {greeting}, <span className="font-semibold text-[#0f1f3d]">{firstName}</span> 👋
-//         </p>
-//       </div>
-//       <div className="flex items-center gap-3">
-//         <button className="relative p-2 rounded-xl hover:bg-[#f4f2ee] transition">
-//           <Bell size={18} className="text-[#5c5a57]" />
-//           <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-[#c8601a] rounded-full"></span>
-//         </button>
-//         <Link
-//           to="/user/interview-setup"
-//           className="hidden sm:inline-flex items-center gap-2 bg-[#c8601a] text-white text-sm font-semibold px-4 py-2 rounded-full shadow-md shadow-[#c8601a]/25 hover:bg-[#b0541a] transition"
-//         >
-//           <Mic size={14} />
-//           Start Interview
-//         </Link>
-//       </div>
-//     </header>
-//   )
-// }
-
-// export default function UserLayout() {
-//   const [sidebarOpen, setSidebarOpen] = useState(false)
-//   const { user } = useAuth()
-
-//   return (
-//     <div className="min-h-screen bg-[#f4f2ee] flex" style={{ fontFamily: "'DM Sans', 'Segoe UI', sans-serif" }}>
-//       <UserSidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} user={user} />
-
-//       <div className="flex-1 lg:ml-64 min-w-0 flex flex-col">
-//         <UserTopBar onMenuClick={() => setSidebarOpen(true)} user={user} />
-//         <main className="flex-1 p-4 lg:p-8">
-//           <Outlet />
-//         </main>
-//       </div>
-//     </div>
-//   )
-// }
-
-
 import { useState } from 'react'
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import {
   LayoutDashboard, Mic, BarChart3, Settings, LogOut,
-  Menu, X, ChevronRight, Bell, BookOpen, Users, Trophy
+  Menu, X, ChevronRight, Bell, Award, Zap
 } from 'lucide-react'
 
 const userNavItems = [
   {
     group: 'MAIN',
     items: [
-      { icon: LayoutDashboard, label: 'Dashboard', href: '/user' },
-      { icon: Mic, label: 'Mock Interviews', href: '/user/interview-setup' },
-      { icon: BarChart3, label: 'My Progress', href: '/user/analytics' },
-    ],
-  },
-  {
-    group: 'PRACTICE',
-    items: [
-      { icon: BookOpen, label: 'My Interviews', href: '/user/interviews' },
-      { icon: Trophy, label: 'Achievements', href: '/user/achievements' },
-      { icon: Users, label: 'Peer Practice', href: '/user/peer' },
+      { icon: LayoutDashboard, label: 'Dashboard',       href: '/user' },
+      { icon: Mic,             label: 'Mock Interviews', href: '/user/interview-setup' },
+      { icon: BarChart3,       label: 'My Progress',     href: '/user/analytics' },
+      { icon: Award,           label: 'My Feedback',     href: '/user/feedback' },
     ],
   },
   {
@@ -261,62 +40,96 @@ function UserSidebar({ open, onClose, user }) {
 
   return (
     <>
-      {/* Mobile overlay */}
       {open && (
         <button
           type="button"
           onClick={onClose}
-          className="fixed inset-0 z-40 bg-[#0f1f3d]/60 lg:hidden"
+          className="fixed inset-0 z-40 bg-black/50 lg:hidden backdrop-blur-sm"
           aria-label="Close sidebar"
         />
       )}
 
       <aside
         className={`
-          fixed left-0 top-0 z-50 h-screen w-72 flex flex-col
-          bg-[#0f1f3d] border-r border-white/10
-          transform transition-transform duration-300
+          fixed left-0 top-0 z-50 h-screen flex flex-col
+          transform transition-transform duration-300 ease-out
           ${open ? 'translate-x-0' : '-translate-x-full'}
           lg:translate-x-0
         `}
+        style={{
+          width: '280px',
+          minWidth: '280px',
+          background: 'linear-gradient(160deg, #0d1b2e 0%, #0f2040 50%, #0d1b2e 100%)',
+          borderRight: '1px solid rgba(255,255,255,0.08)',
+          boxShadow: '4px 0 24px rgba(0,0,0,0.4)',
+        }}
       >
         {/* Brand */}
-        <div className="flex items-center justify-between px-5 py-5 border-b border-white/10 flex-shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-[#c8601a] flex items-center justify-center shadow-lg shadow-[#c8601a]/30">
-              <Mic size={16} className="text-white" />
+        <div style={{ padding: '20px 20px 16px', borderBottom: '1px solid rgba(255,255,255,0.08)', flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{
+                width: '38px', height: '38px', borderRadius: '12px',
+                background: 'linear-gradient(135deg, #f07d2e, #c8601a)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                boxShadow: '0 4px 14px rgba(200,96,26,0.5)',
+                flexShrink: 0,
+              }}>
+                <Mic size={16} color="white" />
+              </div>
+              <div>
+                <p style={{ color: 'white', fontWeight: 700, fontSize: '16px', lineHeight: 1.2, margin: 0 }}>HiLearn</p>
+                <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11px', margin: 0 }}>Interview Prep</p>
+              </div>
             </div>
-            <div>
-              <p className="text-white font-bold text-base leading-tight">HiLearn</p>
-              <p className="text-white/40 text-xs mt-0.5">Interview Prep</p>
-            </div>
+            <button onClick={onClose} className="lg:hidden" style={{ border: 'none', background: 'transparent', cursor: 'pointer' }}>
+              <X size={18} color="rgba(255,255,255,0.5)" />
+            </button>
           </div>
-          <button onClick={onClose} className="lg:hidden text-white/50 hover:text-white">
-            <X size={18} />
-          </button>
         </div>
 
         {/* User info */}
-        <div className="mx-3 mt-4 rounded-xl bg-white/5 px-4 py-3 border border-white/8 flex-shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#c8601a] to-[#0f1f3d] flex items-center justify-center text-white text-sm font-bold flex-shrink-0 shadow-md">
+        <div style={{ margin: '12px 12px 0', padding: '12px 14px', borderRadius: '14px', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)', flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{
+              width: '40px', height: '40px', borderRadius: '50%',
+              background: 'linear-gradient(135deg, #f07d2e, #c8601a)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: 'white', fontSize: '14px', fontWeight: 700,
+              flexShrink: 0, boxShadow: '0 2px 8px rgba(200,96,26,0.4)',
+              border: '2px solid rgba(255,255,255,0.15)',
+            }}>
               {initials}
             </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-white text-sm font-semibold truncate">{user?.name || 'Student'}</p>
-              <p className="text-white/50 text-xs truncate">{user?.email || ''}</p>
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <p style={{ color: 'white', fontSize: '14px', fontWeight: 600, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {user?.name || 'Student'}
+              </p>
+              <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {user?.email || ''}
+              </p>
             </div>
           </div>
         </div>
 
-        {/* Navigation - scrollable */}
-        <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-6 custom-scrollbar">
+        {/* Navigation — scrollable, scrollbar hidden */}
+        <nav style={{
+          flex: 1,
+          overflowY: 'auto',
+          padding: '16px 12px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '20px',
+          scrollbarWidth: 'none',       /* Firefox */
+          msOverflowStyle: 'none',      /* IE/Edge */
+        }}>
+          {/* webkit scrollbar hide via inline style tag trick — handled in global style below */}
           {userNavItems.map((group) => (
             <div key={group.group}>
-              <p className="px-3 mb-2 text-[11px] font-bold uppercase tracking-wider text-white/40">
+              <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: '10px', fontWeight: 700, letterSpacing: '1.2px', textTransform: 'uppercase', padding: '0 10px', marginBottom: '6px' }}>
                 {group.group}
               </p>
-              <div className="space-y-1">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                 {group.items.map((item) => {
                   const Icon = item.icon
                   const isActive = location.pathname === item.href
@@ -325,41 +138,103 @@ function UserSidebar({ open, onClose, user }) {
                       key={item.href}
                       to={item.href}
                       onClick={onClose}
-                      className={`
-                        flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all
-                        ${isActive
-                          ? 'bg-[#c8601a] text-white shadow-md shadow-[#c8601a]/30'
-                          : 'text-white/70 hover:text-white hover:bg-white/10'
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '12px',
+                        padding: '10px 12px',
+                        borderRadius: '12px',
+                        textDecoration: 'none',
+                        fontSize: '14px',
+                        fontWeight: isActive ? 600 : 500,
+                        transition: 'all 0.2s ease',
+                        background: isActive
+                          ? 'linear-gradient(135deg, #c8601a, #e07030)'
+                          : 'transparent',
+                        color: isActive ? 'white' : 'rgba(255,255,255,0.7)',
+                        boxShadow: isActive ? '0 4px 16px rgba(200,96,26,0.35)' : 'none',
+                        border: isActive ? '1px solid rgba(255,255,255,0.15)' : '1px solid transparent',
+                      }}
+                      onMouseEnter={e => {
+                        if (!isActive) {
+                          e.currentTarget.style.background = 'rgba(255,255,255,0.08)'
+                          e.currentTarget.style.color = 'white'
                         }
-                      `}
+                      }}
+                      onMouseLeave={e => {
+                        if (!isActive) {
+                          e.currentTarget.style.background = 'transparent'
+                          e.currentTarget.style.color = 'rgba(255,255,255,0.7)'
+                        }
+                      }}
                     >
-                      <Icon size={18} />
-                      <span>{item.label}</span>
-                      {isActive && <ChevronRight size={14} className="ml-auto opacity-80" />}
+                      <Icon size={18} style={{ flexShrink: 0, opacity: isActive ? 1 : 0.75 }} />
+                      <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {item.label}
+                      </span>
+                      {isActive && <ChevronRight size={14} style={{ flexShrink: 0, opacity: 0.8 }} />}
                     </Link>
                   )
                 })}
               </div>
             </div>
           ))}
-        </nav>
 
-        {/* Upgrade & Logout - fixed bottom */}
-        <div className="flex-shrink-0 px-3 pb-4 pt-2 border-t border-white/10">
-          <div className="rounded-xl bg-gradient-to-br from-[#c8601a]/90 to-[#0f1f3d] p-4 text-white border border-white/15 mb-3">
-            <p className="text-xs font-bold uppercase tracking-wider text-white/70">Free Plan</p>
-            <p className="text-sm font-bold mt-1">Upgrade to Pro</p>
-            <p className="text-xs text-white/70 mt-1 leading-relaxed">Unlimited interviews + AI feedback</p>
+          {/* Upgrade card — INSIDE nav so it scrolls with content */}
+          <div style={{
+            borderRadius: '14px',
+            background: 'linear-gradient(135deg, rgba(200,96,26,0.9) 0%, rgba(15,32,64,0.95) 100%)',
+            padding: '14px 16px',
+            border: '1px solid rgba(255,255,255,0.15)',
+            boxShadow: '0 4px 20px rgba(200,96,26,0.25)',
+            marginTop: 'auto',        /* push to bottom of scroll area */
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+              <Zap size={12} color="rgba(255,220,100,0.9)" fill="rgba(255,220,100,0.6)" />
+              <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '10px', fontWeight: 700, letterSpacing: '1px', textTransform: 'uppercase', margin: 0 }}>
+                Free Plan
+              </p>
+            </div>
+            <p style={{ color: 'white', fontSize: '15px', fontWeight: 700, margin: '0 0 4px' }}>Upgrade to Pro</p>
+            <p style={{ color: 'rgba(255,255,255,0.65)', fontSize: '12px', margin: '0 0 10px', lineHeight: 1.4 }}>
+              Unlimited interviews + AI feedback
+            </p>
             <Link
               to="/pricing"
-              className="mt-3 inline-block w-full text-center py-1.5 rounded-lg bg-white text-[#c8601a] text-xs font-bold hover:bg-white/90 transition"
+              style={{
+                display: 'block', textAlign: 'center', padding: '8px',
+                borderRadius: '10px', background: 'white', color: '#c8601a',
+                fontSize: '12px', fontWeight: 700, textDecoration: 'none',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+                transition: 'all 0.2s',
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = '#fff5f0'}
+              onMouseLeave={e => e.currentTarget.style.background = 'white'}
             >
               Upgrade — ₹299/mo
             </Link>
           </div>
+        </nav>
+
+        {/* Logout — FIXED at bottom, never scrolls */}
+        <div style={{ padding: '8px 12px 12px', flexShrink: 0, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
           <button
             onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-all"
+            style={{
+              width: '100%', display: 'flex', alignItems: 'center', gap: '10px',
+              padding: '10px 14px', borderRadius: '12px', border: 'none',
+              background: 'transparent', color: 'rgba(255, 120, 100, 0.8)',
+              fontSize: '14px', fontWeight: 500, cursor: 'pointer',
+              transition: 'all 0.2s',
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.background = 'rgba(255,80,60,0.12)'
+              e.currentTarget.style.color = 'rgb(255,120,100)'
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.background = 'transparent'
+              e.currentTarget.style.color = 'rgba(255,120,100,0.8)'
+            }}
           >
             <LogOut size={16} />
             <span>Logout</span>
@@ -376,26 +251,57 @@ function UserTopBar({ onMenuClick, user }) {
   const firstName = user?.name?.split(' ')[0] || 'there'
 
   return (
-    <header className="h-16 bg-white/95 backdrop-blur-sm border-b border-[#e0dbd3] flex items-center justify-between px-4 lg:px-8 sticky top-0 z-30">
-      <div className="flex items-center gap-4">
+    <header style={{
+      height: '64px', background: 'rgba(255,255,255,0.95)',
+      backdropFilter: 'blur(12px)', borderBottom: '1px solid rgba(0,0,0,0.08)',
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      padding: '0 28px', position: 'sticky', top: 0, zIndex: 30,
+      boxShadow: '0 1px 12px rgba(0,0,0,0.06)',
+      flexShrink: 0,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
         <button
           onClick={onMenuClick}
-          className="lg:hidden p-2 rounded-xl hover:bg-[#f4f2ee] transition text-[#0f1f3d]"
+          className="lg:hidden"
+          style={{ padding: '8px', borderRadius: '10px', border: 'none', background: 'transparent', cursor: 'pointer' }}
         >
-          <Menu size={22} />
+          <Menu size={22} color="#0f1f3d" />
         </button>
-        <p className="hidden sm:block text-sm text-[#5c5a57]">
-          {greeting}, <span className="font-semibold text-[#0f1f3d]">{firstName}</span> 👋
+        <p style={{ fontSize: '14px', color: '#6b7280', margin: 0 }}>
+          {greeting}, <span style={{ fontWeight: 700, color: '#0f1f3d' }}>{firstName}</span> 👋
         </p>
       </div>
-      <div className="flex items-center gap-3">
-        <button className="relative p-2 rounded-xl hover:bg-[#f4f2ee] transition">
-          <Bell size={18} className="text-[#5c5a57]" />
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-[#c8601a] rounded-full"></span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <button style={{
+          position: 'relative', padding: '8px', borderRadius: '10px',
+          border: 'none', background: 'transparent', cursor: 'pointer',
+        }}>
+          <Bell size={18} color="#6b7280" />
+          <span style={{
+            position: 'absolute', top: '6px', right: '6px',
+            width: '8px', height: '8px', background: '#c8601a', borderRadius: '50%',
+            border: '2px solid white',
+          }} />
         </button>
         <Link
           to="/user/interview-setup"
-          className="hidden sm:inline-flex items-center gap-2 bg-[#c8601a] text-white text-sm font-semibold px-4 py-2 rounded-full shadow-md shadow-[#c8601a]/25 hover:bg-[#b0541a] transition"
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: '8px',
+            background: 'linear-gradient(135deg, #c8601a, #e07030)',
+            color: 'white', fontSize: '13px', fontWeight: 700,
+            padding: '9px 20px', borderRadius: '50px', textDecoration: 'none',
+            boxShadow: '0 4px 14px rgba(200,96,26,0.4)',
+            transition: 'all 0.2s',
+            border: '1px solid rgba(255,255,255,0.2)',
+          }}
+          onMouseEnter={e => {
+            e.currentTarget.style.transform = 'scale(1.04)'
+            e.currentTarget.style.boxShadow = '0 6px 20px rgba(200,96,26,0.5)'
+          }}
+          onMouseLeave={e => {
+            e.currentTarget.style.transform = 'scale(1)'
+            e.currentTarget.style.boxShadow = '0 4px 14px rgba(200,96,26,0.4)'
+          }}
         >
           <Mic size={14} />
           Start Interview
@@ -410,15 +316,47 @@ export default function UserLayout() {
   const { user } = useAuth()
 
   return (
-    <div className="min-h-screen bg-[#faf8f6] flex" style={{ fontFamily: "'DM Sans', 'Segoe UI', sans-serif" }}>
-      <UserSidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} user={user} />
+    <>
+      <style>{`
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
+        aside nav::-webkit-scrollbar { display: none; }
+        body { overflow: hidden; }
+        #root, .app-container { overflow: hidden; height: 100vh; }
+      `}</style>
+      <div
+        className="no-scrollbar"
+        style={{
+          minHeight: '100vh',
+          background: '#f5f3f0',
+          display: 'flex',
+          overflow: 'hidden',
+          fontFamily: "'DM Sans', 'Segoe UI', sans-serif",
+        }}
+      >
+        <UserSidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} user={user} />
 
-      <div className="flex-1 lg:ml-72 min-w-0 flex flex-col">
-        <UserTopBar onMenuClick={() => setSidebarOpen(true)} user={user} />
-        <main className="flex-1 p-4 lg:p-8 overflow-y-auto">
-          <Outlet />
-        </main>
+        <div
+          className="no-scrollbar"
+          style={{
+            flex: 1,
+            marginLeft: '280px',
+            minWidth: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            height: '100vh',
+            overflow: 'hidden',
+          }}
+        >
+          <UserTopBar onMenuClick={() => setSidebarOpen(true)} user={user} />
+          <main
+            className="no-scrollbar"
+            style={{ flex: 1, padding: '28px 32px', overflowY: 'auto' }}
+          >
+            <Outlet />
+          </main>
+        </div>
       </div>
-    </div>
+    </>
   )
 }

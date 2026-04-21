@@ -410,13 +410,22 @@
 # # ── Module-level service singleton ─────────────────────────
 # auth_service = AuthService()
 
+"""
+HiLearn AI Interview Prep - Authentication Service
+====================================================
+Business logic for user signup, login, logout, and token refresh.
+
+Uses MongoDB (Motor async) for persistent user storage.
+Token blacklist is stored in a MongoDB collection so revoked tokens
+survive server restarts.
+"""
 import re
 import uuid
 from datetime import datetime
-from typing import Dict, Optional, Set
+from typing import Optional
 
-from loguru import logger
 from fastapi import HTTPException, status
+from loguru import logger
 
 from app.core.config import get_settings
 from app.core.security import (
@@ -425,22 +434,23 @@ from app.core.security import (
     hash_password,
     verify_password,
 )
+from app.db.database import db
 from app.models.schemas import (
     AuthResponse,
     LoginRequest,
     SignupRequest,
     TokenResponse,
-    UserInDB,
     UserProfile,
+    UserRole,
 )
-from app.db.database import db   # <-- MongoDB connection
 
 settings = get_settings()
 
 # ─────────────────────────────────────────────────────────
-# In-Memory Stores (only for token blacklist, optional)
+# MongoDB Collections
 # ─────────────────────────────────────────────────────────
-_token_blacklist: Set[str] = set()           # revoked JWT tokens
+_users_col = db["users"]               # { user_id, email, name, role, hashed_password, created_at }
+_blacklist_col = db["token_blacklist"]  # { token, revoked_at }
 
 
 # ─────────────────────────────────────────────────────────
@@ -452,7 +462,6 @@ _EMAIL_REGEX = re.compile(
 
 
 def _is_valid_email(email: str) -> bool:
-    """Validate email format using regex."""
     return bool(_EMAIL_REGEX.match(email))
 
 
@@ -461,12 +470,6 @@ def _is_valid_email(email: str) -> bool:
 # ─────────────────────────────────────────────────────────
 
 def _validate_password_strength(password: str) -> Optional[str]:
-    """
-    Validate password meets security requirements.
-
-    Returns:
-        None if valid, or an error message string if invalid.
-    """
     if len(password) < 8:
         return "Password must be at least 8 characters long."
     if not re.search(r"[A-Z]", password):
@@ -487,7 +490,7 @@ def _validate_password_strength(password: str) -> Optional[str]:
 class AuthService:
     """
     Authentication service handling user registration, login,
-    logout, and token management.
+    logout, and token management backed by MongoDB.
     """
 
     # ── Signup ────────────────────────────────────────────
@@ -495,6 +498,19 @@ class AuthService:
     async def signup(self, payload: SignupRequest) -> AuthResponse:
         """
         Register a new user.
+
+        Flow:
+            1. Validate email format
+            2. Check email uniqueness (MongoDB)
+            3. Validate password strength
+            4. Hash password with bcrypt
+            5. Insert user document into MongoDB
+            6. Generate JWT access token
+            7. Return AuthResponse
+
+        Raises:
+            HTTPException 400: Invalid email or weak password.
+            HTTPException 409: Email already registered.
         """
         email = payload.email.lower().strip()
         logger.info("[SIGNUP] Attempting registration | email={}", email)
@@ -508,8 +524,7 @@ class AuthService:
             )
 
         # Check email uniqueness in MongoDB
-        users_collection = db["users"]
-        existing = await users_collection.find_one({"email": email})
+        existing = await _users_col.find_one({"email": email})
         if existing:
             logger.warning("[SIGNUP] Duplicate email | email={}", email)
             raise HTTPException(
@@ -526,13 +541,13 @@ class AuthService:
                 detail=password_error,
             )
 
-        # Hash password
+        # Hash password — NEVER store plain text
         hashed = hash_password(payload.password)
 
-        # Create user record
+        # Build user document
         user_id = str(uuid.uuid4())
         user_doc = {
-            "_id": user_id,
+            "user_id": user_id,
             "email": email,
             "name": payload.name.strip(),
             "role": payload.role.value,
@@ -540,9 +555,8 @@ class AuthService:
             "created_at": datetime.utcnow(),
         }
 
-        # Store in MongoDB
-        await users_collection.insert_one(user_doc)
-
+        # Persist to MongoDB
+        await _users_col.insert_one(user_doc)
         logger.success(
             "[SIGNUP] User registered | user_id={} | email={} | role={}",
             user_id, email, payload.role.value,
@@ -565,11 +579,21 @@ class AuthService:
     async def login(self, payload: LoginRequest) -> AuthResponse:
         """
         Authenticate an existing user.
+
+        Flow:
+            1. Admin shortcut check (from .env credentials)
+            2. Find user by email in MongoDB
+            3. Verify password against bcrypt hash
+            4. Generate JWT access token
+            5. Return AuthResponse
+
+        Raises:
+            HTTPException 401: Invalid email or password.
         """
         email = payload.email.lower().strip()
         logger.info("[LOGIN] Attempting login | email={}", email)
 
-        # ── Admin login check (from .env credentials) ─────────
+        # ── Admin login check (plain text comparison with .env value) ──
         if email == settings.admin_email.lower().strip():
             if payload.password != settings.admin_password:
                 raise HTTPException(
@@ -589,8 +613,7 @@ class AuthService:
             )
 
         # Find user by email in MongoDB
-        users_collection = db["users"]
-        user_doc = await users_collection.find_one({"email": email})
+        user_doc = await _users_col.find_one({"email": email})
         if not user_doc:
             logger.warning("[LOGIN] User not found | email={}", email)
             raise HTTPException(
@@ -608,30 +631,39 @@ class AuthService:
                 headers={"WWW-Authenticate": "Bearer"},
             )
 
+        user_id = user_doc["user_id"]
+        role = user_doc["role"]
+        name = user_doc["name"]
+
         logger.success(
             "[LOGIN] Login successful | user_id={} | email={} | role={}",
-            user_doc["_id"], email, user_doc["role"],
+            user_id, email, role,
         )
 
         # Generate JWT
         token = create_access_token(
-            data={"sub": user_doc["_id"], "role": user_doc["role"], "email": email}
+            data={"sub": user_id, "role": role, "email": email}
         )
 
         return AuthResponse(
-            user_id=user_doc["_id"],
+            user_id=user_id,
             token=token,
-            role=user_doc["role"],
-            message=f"Welcome back, {user_doc['name']}!",
+            role=role,
+            message=f"Welcome back, {name}!",
         )
 
     # ── Logout ────────────────────────────────────────────
 
     async def logout(self, token: str) -> dict:
         """
-        Invalidate a JWT token by adding it to the blacklist.
+        Invalidate a JWT token by inserting it into the MongoDB blacklist.
+        Survives server restarts unlike the old in-memory set.
         """
-        _token_blacklist.add(token)
+        await _blacklist_col.update_one(
+            {"token": token},
+            {"$setOnInsert": {"token": token, "revoked_at": datetime.utcnow()}},
+            upsert=True,
+        )
         logger.info("[LOGOUT] Token blacklisted | token_prefix={}...", token[:20])
         return {"message": "Logged out successfully. Token has been revoked."}
 
@@ -640,9 +672,18 @@ class AuthService:
     async def refresh_token(self, token: str) -> TokenResponse:
         """
         Issue a new JWT token from a valid existing token.
+
+        Flow:
+            1. Ensure it's not blacklisted (MongoDB)
+            2. Decode the existing token
+            3. Blacklist the old token
+            4. Issue a fresh token with the same claims
+
+        Raises:
+            HTTPException 401: If token is invalid, expired, or blacklisted.
         """
-        # Check blacklist
-        if self.is_token_blacklisted(token):
+        # Check blacklist first
+        if await self.is_token_blacklisted(token):
             logger.warning("[REFRESH] Attempted refresh with blacklisted token")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -651,10 +692,10 @@ class AuthService:
             )
 
         # Decode (will raise 401 if invalid/expired)
-        payload = decode_access_token(token)
-        user_id = payload.get("sub")
-        role = payload.get("role")
-        email = payload.get("email")
+        token_payload = decode_access_token(token)
+        user_id = token_payload.get("sub")
+        role = token_payload.get("role")
+        email = token_payload.get("email")
 
         if not user_id:
             raise HTTPException(
@@ -663,8 +704,12 @@ class AuthService:
                 headers={"WWW-Authenticate": "Bearer"},
             )
 
-        # Blacklist old token
-        _token_blacklist.add(token)
+        # Blacklist old token in MongoDB
+        await _blacklist_col.update_one(
+            {"token": token},
+            {"$setOnInsert": {"token": token, "revoked_at": datetime.utcnow()}},
+            upsert=True,
+        )
 
         # Issue new token
         new_token = create_access_token(
@@ -676,35 +721,91 @@ class AuthService:
 
     # ── Get User Profile ──────────────────────────────────
 
-    async def get_profile(self, user_id: str) -> UserProfile:
-        """
-        Retrieve a user's public profile by their ID.
-        """
-        users_collection = db["users"]
-        user_doc = await users_collection.find_one({"_id": user_id})
-        if not user_doc:
-            logger.warning("[PROFILE] User not found | user_id={}", user_id)
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="User not found. Token may be stale.",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
+    # async def get_profile(self, user_id: str) -> UserProfile:
+    #     """
+    #     Retrieve a user's public profile by their ID.
+    #     Handles the special 'admin' user_id that has no DB record.
 
+    #     Raises:
+    #         HTTPException 401: If user not found.
+    #     """
+    #     # FIX: admin has no DB record — return a synthetic profile
+    #     if user_id == "admin":
+    #         return UserProfile(
+    #             user_id="admin",
+    #             email=settings.admin_email,
+    #             name="Admin",
+    #             role=UserRole.ADMIN,
+    #             created_at=datetime.utcnow(),
+    #         )
+
+    #     user_doc = await _users_col.find_one({"user_id": user_id})
+    #     if not user_doc:
+    #         logger.warning("[PROFILE] User not found | user_id={}", user_id)
+    #         raise HTTPException(
+    #             status_code=status.HTTP_401_UNAUTHORIZED,
+    #             detail="User not found. Token may be stale.",
+    #             headers={"WWW-Authenticate": "Bearer"},
+    #         )
+
+    #     return UserProfile(
+    #         user_id=user_doc["user_id"],
+    #         email=user_doc["email"],
+    #         name=user_doc["name"],
+    #         role=UserRole(user_doc["role"]),
+    #         created_at=user_doc["created_at"],
+    #     )
+
+    from fastapi import HTTPException, status
+from datetime import datetime
+
+async def get_profile(self, user_id: str) -> UserProfile:
+    """
+    Retrieve a user's public profile by their ID.
+    Handles the special 'admin' user_id that has no DB record.
+    """
+
+    # ✅ Admin case
+    if user_id == "admin":
         return UserProfile(
-            user_id=user_doc["_id"],
-            email=user_doc["email"],
-            name=user_doc["name"],
-            role=user_doc["role"],
-            created_at=user_doc["created_at"],
+            user_id="admin",
+            email=settings.admin_email,
+            name="Admin",
+            role=UserRole.ADMIN,
+            created_at=datetime.utcnow(),
         )
 
-    # ── Helper (blacklist check only) ────────────────────
+    # ✅ DB fetch (FIXED)
+    user_doc = await _users_col.find_one({"_id": user_id})
 
-    def is_token_blacklisted(self, token: str) -> bool:
+    if not user_doc:
+        logger.warning("[PROFILE] User not found | user_id={}", user_id)
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found. Token may be stale.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    # ✅ Safe return
+    return UserProfile(
+        user_id=str(user_doc.get("_id")),
+        email=user_doc.get("email", ""),
+        name=user_doc.get("name", ""),
+        role=UserRole(user_doc.get("role", "student")),
+        created_at=user_doc.get("created_at", datetime.utcnow()),
+    )
+
+    # ── Token Blacklist Helpers ───────────────────────────
+
+    async def is_token_blacklisted(self, token: str) -> bool:
         """
-        Check if a token has been revoked (logged out).
+        Check if a token has been revoked via MongoDB lookup.
+
+        Returns:
+            True if blacklisted, False otherwise.
         """
-        return token in _token_blacklist
+        doc = await _blacklist_col.find_one({"token": token})
+        return doc is not None
 
 
 # ── Module-level service singleton ─────────────────────────
