@@ -22,6 +22,7 @@ ENV/
 
 # Environment variables (NEVER commit this!)
 .env
+.env.example
 *.env.local
 
 # IDE
