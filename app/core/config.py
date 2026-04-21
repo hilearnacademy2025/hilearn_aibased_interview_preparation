@@ -58,6 +58,10 @@ class Settings(BaseSettings):
     max_upload_size_mb: int = 10
     upload_dir: str = "./uploads"
 
+    # ── Admin Credentials ─────────────────────────────────────────────────
+    admin_email: str = "admin@hilearn.ai"
+    admin_password: str = "Admin@HiLearn123"
+
     # ── Tier Limits ───────────────────────────────────────────────────────
     free_tier_interviews_per_month: int = 3
     pro_tier_price_inr: int = 299
