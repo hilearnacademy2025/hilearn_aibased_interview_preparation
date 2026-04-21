@@ -4,10 +4,14 @@ POST /start-interview      →  Begin a new session
 POST /submit-answer        →  Submit answer and get AI feedback
 POST /transcribe-audio     →  (Day 3) Google Cloud STT + Librosa voice analysis
 GET  /session/{id}         →  Retrieve session details
+GET  /history/{user_id}    →  (Day 5) Retrieve user's interview history from MongoDB
 """
-from fastapi import APIRouter, HTTPException, UploadFile, File
+from typing import Any, Dict, List, Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from loguru import logger
 
+from app.core.security import get_current_user
 from app.models.schemas import (
     APIResponse,
     StartInterviewRequest,
@@ -44,10 +48,8 @@ async def start_interview(payload: StartInterviewRequest) -> StartInterviewRespo
     **Flow:**
     1. Validate request (job role, type, difficulty)
     2. Generate context-aware first question (AI-powered, Day 2)
-    3. Create session in DB (Day 4)
+    3. Create session in DB (Day 5) + in-memory cache
     4. Return session ID + first question
-
-    **TODO (Day 2):** Replace static question bank with Groq llama-3.3-70b.
     """
     logger.info(
         f"[START-INTERVIEW] user={payload.user_id} role={payload.job_role} "
@@ -77,11 +79,9 @@ async def submit_answer(payload: SubmitAnswerRequest) -> SubmitAnswerResponse:
     1. Validate session exists and is active
     2. Score answer via Groq (Day 2)
     3. Analyse voice if audio provided (Day 3)
-    4. Determine if follow-up is needed (real-time conversation, Day 2)
-    5. Return feedback + next question
-
-    **TODO (Day 2):** Wire Groq for real content scoring & follow-up generation.
-    **TODO (Day 3):** Wire Librosa/Whisper for voice/filler-word analysis.
+    4. Persist answer + feedback to MongoDB (Day 5)
+    5. Determine if follow-up is needed (real-time conversation, Day 2)
+    6. Return feedback + next question
     """
     logger.info(
         f"[SUBMIT-ANSWER] session={payload.session_id} "
@@ -202,7 +202,8 @@ async def get_session(session_id: str) -> APIResponse:
     """
     Fetch session metadata (status, progress, answers so far).
 
-    TODO (Day 4): Query MongoDB for persistent session data.
+    Day 5: Checks in-memory cache first, then falls back to MongoDB
+    for historical sessions.
     """
     session = await interview_service.get_session(session_id)
     if not session:
@@ -222,4 +223,87 @@ async def get_session(session_id: str) -> APIResponse:
     return APIResponse(
         message="Session retrieved successfully",
         data=serializable,
+    )
+
+
+# ─────────────────────────────────────────────────────────
+# GET /interview/history/{user_id}  (Day 5)
+# ─────────────────────────────────────────────────────────
+@router.get(
+    "/history/{user_id}",
+    response_model=APIResponse,
+    summary="Get Interview History",
+    description=(
+        "Retrieve a user's interview history from MongoDB. "
+        "Returns a paginated list of past interviews, newest first. "
+        "Requires a valid Bearer token."
+    ),
+    responses={
+        200: {"description": "Interview history retrieved"},
+        401: {"description": "Missing or invalid token"},
+    },
+)
+async def get_interview_history(
+    user_id: str,
+    limit: int = Query(default=20, ge=1, le=100, description="Max results to return"),
+    skip: int = Query(default=0, ge=0, description="Number of results to skip"),
+    user: Dict[str, Any] = Depends(get_current_user),
+) -> APIResponse:
+    """
+    **Day 5 — Interview History from MongoDB**
+
+    Retrieves the authenticated user's interview history.
+    Validates that the requesting user owns the data (user_id must match token).
+
+    Args:
+        user_id: User whose history to retrieve.
+        limit: Pagination limit (default 20, max 100).
+        skip: Pagination offset.
+        user: JWT-authenticated user payload (injected via Depends).
+
+    Returns:
+        APIResponse with list of interview summaries.
+    """
+    # Security: ensure users can only view their own history
+    token_user_id = user.get("sub")
+    token_role = user.get("role", "student")
+    if token_user_id != user_id and token_role != "admin":
+        raise HTTPException(
+            status_code=403,
+            detail="You can only view your own interview history.",
+        )
+
+    logger.info(
+        "[INTERVIEW-HISTORY] user_id={} | limit={} | skip={}",
+        user_id, limit, skip,
+    )
+
+    interviews = await interview_service.get_user_interview_history(
+        user_id=user_id, limit=limit, skip=skip,
+    )
+
+    # Build simplified summaries for the response
+    summaries = []
+    for interview in interviews:
+        summaries.append({
+            "session_id": interview.get("session_id"),
+            "interview_type": interview.get("interview_type"),
+            "job_role": interview.get("job_role"),
+            "difficulty": interview.get("difficulty"),
+            "status": interview.get("status"),
+            "questions_count": len(interview.get("questions", [])),
+            "answers_count": len(interview.get("answers", [])),
+            "created_at": str(interview.get("created_at", "")),
+            "completed_at": str(interview.get("completed_at", "")) if interview.get("completed_at") else None,
+        })
+
+    return APIResponse(
+        message=f"Found {len(summaries)} interview(s)",
+        data={
+            "user_id": user_id,
+            "total_returned": len(summaries),
+            "limit": limit,
+            "skip": skip,
+            "interviews": summaries,
+        },
     )
