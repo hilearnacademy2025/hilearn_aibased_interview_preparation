@@ -1,20 +1,28 @@
+
 # """
 # HiLearn AI Interview Prep - Interview Service Layer
 # Business logic for managing interview sessions.
 
 # Day 2: Groq AI integrated for question generation & answer evaluation. ✅
 # Day 3: Google Cloud Speech-to-Text (STT) + Librosa voice analysis wired in.       ✅
-# TODO (Day 4): Wire up MongoDB for session persistence.
+# Day 5: MongoDB persistence via DatabaseService — in-memory cache retained for
+#        fast reads during active sessions, DB used for persistence.               ✅
 # """
 # import json
 # import uuid
 # from datetime import datetime
-# from typing import Optional
+# from typing import Any, Dict, List, Optional
 
 # from groq import AsyncGroq
 # from loguru import logger
 
 # from app.core.config import get_settings
+# from app.models.db_models import (
+#     AnswerRecord,
+#     FeedbackDocument,
+#     InterviewDocument,
+#     InterviewStatus,
+# )
 # from app.models.schemas import (
 #     AnswerFeedback,
 #     CommunicationAnalysis,
@@ -52,7 +60,7 @@
 
 
 # # ─────────────────────────────────────────────────────────
-# # In-Memory Session Store (temporary until MongoDB Day 4)
+# # In-Memory Session Cache (fast reads; DB for persistence)
 # # ─────────────────────────────────────────────────────────
 # _session_store: dict = {}
 
@@ -297,6 +305,169 @@
 
 
 # # ─────────────────────────────────────────────────────────────────────────────
+# # DB Persistence Helpers (Day 5)
+# # ─────────────────────────────────────────────────────────────────────────────
+
+# def _get_db_service():
+#     """
+#     Lazy import to avoid circular imports at module load time.
+
+#     Returns:
+#         The singleton DatabaseService instance.
+#     """
+#     from app.services.database import db_service
+#     return db_service
+
+
+# async def _persist_interview_to_db(session_data: dict) -> None:
+#     """
+#     Save a new interview session to MongoDB.
+#     Non-blocking — failures are logged but never crash the request.
+
+#     Args:
+#         session_data: The in-memory session dict.
+#     """
+#     try:
+#         db = _get_db_service()
+#         if not db.is_connected:
+#             return
+
+#         interview_doc = InterviewDocument(
+#             session_id=session_data["session_id"],
+#             user_id=session_data["user_id"],
+#             interview_type=session_data["interview_type"].value,
+#             difficulty=session_data["difficulty"].value,
+#             job_role=session_data["job_role"],
+#             questions=session_data["questions"],
+#             answers=[],
+#             current_index=0,
+#             status=InterviewStatus.ACTIVE,
+#             created_at=session_data["started_at"],
+#         )
+#         await db.create_interview(interview_doc)
+#     except Exception as exc:
+#         logger.error("[DB] _persist_interview_to_db failed | error={}", exc)
+
+
+# async def _persist_answer_to_db(
+#     session_id: str,
+#     question_id: str,
+#     answer_text: str,
+#     content_score: float,
+#     feedback_text: str,
+# ) -> None:
+#     """
+#     Append an answer to the interview document in MongoDB.
+#     Non-blocking — failures are logged but never crash the request.
+
+#     Args:
+#         session_id: Interview session ID.
+#         question_id: Question ID being answered.
+#         answer_text: User's answer text.
+#         content_score: Groq's content score.
+#         feedback_text: Groq's feedback.
+#     """
+#     try:
+#         db = _get_db_service()
+#         if not db.is_connected:
+#             return
+
+#         answer_record = {
+#             "question_id": question_id,
+#             "answer_text": answer_text,
+#             "submitted_at": datetime.utcnow().isoformat(),
+#             "content_score": content_score,
+#             "feedback": feedback_text,
+#         }
+#         await db.add_answer_to_interview(session_id, answer_record)
+#     except Exception as exc:
+#         logger.error("[DB] _persist_answer_to_db failed | error={}", exc)
+
+
+# async def _persist_feedback_to_db(
+#     session_id: str,
+#     question_id: str,
+#     user_id: str,
+#     feedback: AnswerFeedback,
+#     communication: CommunicationAnalysis,
+# ) -> None:
+#     """
+#     Save detailed feedback to the ``feedback`` collection in MongoDB.
+#     Non-blocking — failures are logged but never crash the request.
+
+#     Args:
+#         session_id: Interview session ID.
+#         question_id: Question ID.
+#         user_id: User ID.
+#         feedback: The AnswerFeedback object.
+#         communication: The CommunicationAnalysis object.
+#     """
+#     try:
+#         db = _get_db_service()
+#         if not db.is_connected:
+#             return
+
+#         feedback_doc = FeedbackDocument(
+#             interview_id=session_id,
+#             question_id=question_id,
+#             user_id=user_id,
+#             content_score=feedback.content_score,
+#             communication_score=communication.confidence_score,
+#             filler_words_detected=communication.filler_words_detected,
+#             wpm=communication.speaking_pace_wpm or 0,
+#             confidence_score=communication.confidence_score,
+#             clarity_score=communication.clarity_score,
+#             suggestions=feedback.improvements,
+#             overall_score=feedback.overall_score,
+#         )
+#         await db.save_feedback(feedback_doc)
+#     except Exception as exc:
+#         logger.error("[DB] _persist_feedback_to_db failed | error={}", exc)
+
+
+# async def _update_session_status_in_db(session_id: str, status: str) -> None:
+#     """
+#     Update the interview status in MongoDB (e.g. on completion).
+
+#     Args:
+#         session_id: Interview session ID.
+#         status: New status value.
+#     """
+#     try:
+#         db = _get_db_service()
+#         if not db.is_connected:
+#             return
+
+#         update_data: Dict[str, Any] = {"status": status}
+#         if status == InterviewStatus.COMPLETED.value:
+#             update_data["completed_at"] = datetime.utcnow()
+
+#         await db.update_interview(session_id, update_data)
+#     except Exception as exc:
+#         logger.error("[DB] _update_session_status_in_db failed | error={}", exc)
+
+
+# async def _update_user_stats_in_db(user_id: str, overall_score: float) -> None:
+#     """
+#     Update user stats and analytics in MongoDB after an interview completes.
+
+#     Args:
+#         user_id: The user's ID.
+#         overall_score: The overall score from the interview.
+#     """
+#     try:
+#         db = _get_db_service()
+#         if not db.is_connected:
+#             return
+
+#         await db.update_user_stats(user_id, overall_score)
+#         await db.update_user_analytics(user_id, overall_score)
+#         await db.update_admin_stats()
+#     except Exception as exc:
+#         logger.error("[DB] _update_user_stats_in_db failed | error={}", exc)
+
+
+# # ─────────────────────────────────────────────────────────────────────────────
 # # Interview Service
 # # ─────────────────────────────────────────────────────────────────────────────
 
@@ -311,6 +482,7 @@
 #         """
 #         Initialize a new interview session and return the first question.
 #         Uses Groq llama-3.3-70b-versatile to generate a tailored first question.
+#         Persists the session to MongoDB for long-term storage.
 #         """
 #         session_id = str(uuid.uuid4())
 #         logger.info(
@@ -355,6 +527,9 @@
 #         _session_store[session_id] = session_data
 #         logger.debug("Session stored in memory: {}", session_id)
 
+#         # ── Day 5: Persist to MongoDB (non-blocking) ─────────────────────
+#         await _persist_interview_to_db(session_data)
+
 #         total_q = len(session_data["questions"])
 #         return StartInterviewResponse(
 #             session_id=session_id,
@@ -377,8 +552,7 @@
 #         1. Evaluate with Groq (content score + feedback).
 #         2. Generate Groq follow-up question (stored as next question if applicable).
 #         3. Advance session to the next question.
-
-#         TODO (Day 3): Call Librosa for filler word / pacing detection if audio provided.
+#         4. Persist answer + feedback to MongoDB (Day 5).
 #         """
 #         session = _session_store.get(payload.session_id)
 #         if not session:
@@ -402,12 +576,27 @@
 #         )
 
 #         # Store the answer
-#         session["answers"].append({
+#         answer_record = {
 #             "question_id": payload.question_id,
 #             "answer_text": payload.answer_text,
-#             "submitted_at": datetime.utcnow(),
-#         })
+#             "submitted_at": datetime.utcnow().isoformat(),
+#         }
 
+#         session["answers"].append(answer_record)
+
+# # ✅ Single evaluation call
+#         eval_result = await _groq_evaluate_answer(
+#              question=current_question_text,
+#              user_answer=payload.answer_text,
+#              job_role=session["job_role"],
+#              interview_type=session["interview_type"],
+#         )
+
+#         content_score = eval_result.get("content_score", 5.0)
+#         groq_feedback = eval_result.get("feedback", "Good attempt.")
+
+# # ✅ Score assign once
+#         answer_record["overall_score"] = round(content_score * 0.95, 1)
 #         # ── Day 2: Real Groq answer evaluation ────────────────────────────
 #         eval_result = await _groq_evaluate_answer(
 #             question=current_question_text,
@@ -417,6 +606,8 @@
 #         )
 #         content_score = eval_result["content_score"]
 #         groq_feedback = eval_result["feedback"]
+#         # Save score back into answer record so session history can compute avg
+#         answer_record["overall_score"] = round(content_score * 0.95, 1)
 
 #         # ── Day 2: Real Groq follow-up generation ─────────────────────────
 #         followup_text = await _groq_generate_followup(
@@ -499,6 +690,22 @@
 #             communication=communication,
 #         )
 
+#         # ── Day 5: Persist answer + feedback to MongoDB ───────────────────
+#         await _persist_answer_to_db(
+#             session_id=payload.session_id,
+#             question_id=payload.question_id,
+#             answer_text=payload.answer_text,
+#             content_score=content_score,
+#             feedback_text=groq_feedback,
+#         )
+#         await _persist_feedback_to_db(
+#             session_id=payload.session_id,
+#             question_id=payload.question_id,
+#             user_id=session["user_id"],
+#             feedback=feedback,
+#             communication=communication,
+#         )
+
 #         # ── Advance to Next Question ───────────────────────────────────────
 #         session["current_index"] += 1
 #         questions = session["questions"]
@@ -519,6 +726,12 @@
 #             session["status"] = SessionStatus.COMPLETED
 #             logger.info("Session completed: {}", payload.session_id)
 
+#             # ── Day 5: Update session status + user stats in MongoDB ──────
+#             await _update_session_status_in_db(
+#                 payload.session_id, InterviewStatus.COMPLETED.value
+#             )
+#             await _update_user_stats_in_db(session["user_id"], derived)
+
 #         return SubmitAnswerResponse(
 #             session_id=payload.session_id,
 #             question_id=payload.question_id,
@@ -538,8 +751,85 @@
 #     # ── Session Retrieval ──────────────────────────────────────────────────
 
 #     async def get_session(self, session_id: str) -> Optional[dict]:
-#         """Retrieve a session from the in-memory store."""
-#         return _session_store.get(session_id)
+#         """
+#         Retrieve a session — check in-memory cache first, then MongoDB.
+
+#         Args:
+#             session_id: The session's unique identifier.
+
+#         Returns:
+#             Session dict if found, None otherwise.
+#         """
+#         # Try in-memory cache first (fast path for active sessions)
+#         cached = _session_store.get(session_id)
+#         if cached:
+#             return cached
+
+#         # Fallback to MongoDB for historical sessions
+#         try:
+#             db = _get_db_service()
+#             if db.is_connected:
+#                 interview = await db.get_interview(session_id)
+#                 if interview:
+#                     logger.debug("Session loaded from MongoDB: {}", session_id)
+#                     return interview.model_dump()
+#         except Exception as exc:
+#             logger.error("get_session DB fallback failed | session_id={} | error={}", session_id, exc)
+
+#         return None
+
+#     # ── User Interview History (Day 5) ─────────────────────────────────────
+
+#     async def get_user_interview_history(
+#         self, user_id: str, limit: int = 20, skip: int = 0
+#     ) -> List[Dict[str, Any]]:
+#         """
+#         Retrieve a user's interview history from MongoDB.
+
+#         Args:
+#             user_id: The user's unique identifier.
+#             limit: Maximum number of results.
+#             skip: Number of results to skip for pagination.
+
+#         Returns:
+#             List of interview dicts (newest first).
+#         """
+#         try:
+#             db = _get_db_service()
+#             if not db.is_connected:
+#                 logger.debug("get_user_interview_history skipped — DB not connected")
+#                 return []
+
+#             interviews = await db.get_user_interviews(user_id, limit=limit, skip=skip)
+#             return [interview.model_dump() for interview in interviews]
+#         except Exception as exc:
+#             logger.error(
+#                 "get_user_interview_history failed | user_id={} | error={}",
+#                 user_id, exc,
+#             )
+#             return []
+
+#     async def get_user_sessions(self, user_id: str) -> list:
+#         """Return all sessions for a given user_id from in-memory store."""
+#         sessions = []
+#         for session_id, session in _session_store.items():
+#             if session.get("user_id") == user_id:
+#                 answers = session.get("answers", [])
+#                 scores = [a.get("overall_score", 0) for a in answers if a.get("overall_score")]
+#                 avg_score = round(sum(scores) / len(scores), 1) if scores else 0
+#                 sessions.append({
+#                     "session_id": session_id,
+#                     "interview_type": session.get("interview_type", "technical"),
+#                     "job_role": session.get("job_role", ""),
+#                     "difficulty": session.get("difficulty", "intermediate"),
+#                     "status": str(session.get("status", "active")),
+#                     "started_at": str(session.get("started_at", "")),
+#                     "questions_answered": session.get("current_index", 0),
+#                     "total_questions": len(session.get("questions", [])),
+#                     "avg_score": avg_score,
+#                 })
+#         sessions.sort(key=lambda s: s["started_at"], reverse=True)
+#         return sessions
 
 #     # ── Private Helpers ────────────────────────────────────────────────────
 
@@ -578,17 +868,24 @@ Business logic for managing interview sessions.
 
 Day 2: Groq AI integrated for question generation & answer evaluation. ✅
 Day 3: Google Cloud Speech-to-Text (STT) + Librosa voice analysis wired in.       ✅
-TODO (Day 4): Wire up MongoDB for session persistence.
+Day 5: MongoDB persistence via DatabaseService — in-memory cache retained for
+       fast reads during active sessions, DB used for persistence.               ✅
 """
 import json
 import uuid
 from datetime import datetime
-from typing import Optional
+from typing import Any, Dict, List, Optional
 
 from groq import AsyncGroq
 from loguru import logger
 
 from app.core.config import get_settings
+from app.models.db_models import (
+    AnswerRecord,
+    FeedbackDocument,
+    InterviewDocument,
+    InterviewStatus,
+)
 from app.models.schemas import (
     AnswerFeedback,
     CommunicationAnalysis,
@@ -626,7 +923,7 @@ def _get_groq_client() -> AsyncGroq:
 
 
 # ─────────────────────────────────────────────────────────
-# In-Memory Session Store (temporary until MongoDB Day 4)
+# In-Memory Session Cache (fast reads; DB for persistence)
 # ─────────────────────────────────────────────────────────
 _session_store: dict = {}
 
@@ -726,7 +1023,6 @@ async def _groq_generate_question(
 
     except Exception as exc:
         logger.error("Groq | generate_question | FAILED | error={} | using fallback", exc)
-        # Fallback: first question from the static bank
         fallback_list = QUESTION_BANK.get(interview_type, QUESTION_BANK[InterviewType.TECHNICAL])
         return fallback_list[0]
 
@@ -777,12 +1073,11 @@ async def _groq_evaluate_answer(
                 {"role": "user", "content": prompt},
             ],
             max_tokens=200,
-            temperature=0.3,   # lower temp → more consistent JSON
+            temperature=0.3,
         )
         raw = response.choices[0].message.content.strip()
         logger.debug("Groq | evaluate_answer | raw={}", raw)
 
-        # Strip markdown code fences if model wraps JSON in ```json … ```
         if raw.startswith("```"):
             raw = raw.split("```")[1]
             if raw.startswith("json"):
@@ -791,7 +1086,7 @@ async def _groq_evaluate_answer(
 
         result = json.loads(raw)
         score = float(result.get("content_score", 5.0))
-        score = max(0.0, min(10.0, score))      # clamp to [0, 10]
+        score = max(0.0, min(10.0, score))
         feedback = str(result.get("feedback", "Good attempt. Keep practising."))
 
         logger.success(
@@ -871,6 +1166,140 @@ async def _groq_generate_followup(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# DB Persistence Helpers (Day 5)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _get_db_service():
+    """
+    Lazy import to avoid circular imports at module load time.
+
+    Returns:
+        The singleton DatabaseService instance.
+    """
+    from app.services.database import db_service
+    return db_service
+
+
+async def _persist_interview_to_db(session_data: dict) -> None:
+    """
+    Save a new interview session to MongoDB.
+    Non-blocking — failures are logged but never crash the request.
+    """
+    try:
+        db = _get_db_service()
+        if not db.is_connected:
+            return
+
+        interview_doc = InterviewDocument(
+            session_id=session_data["session_id"],
+            user_id=session_data["user_id"],
+            interview_type=session_data["interview_type"].value,
+            difficulty=session_data["difficulty"].value,
+            job_role=session_data["job_role"],
+            questions=session_data["questions"],
+            answers=[],
+            current_index=0,
+            status=InterviewStatus.ACTIVE,
+            created_at=session_data["started_at"],
+        )
+        await db.create_interview(interview_doc)
+    except Exception as exc:
+        logger.error("[DB] _persist_interview_to_db failed | error={}", exc)
+
+
+async def _persist_answer_to_db(
+    session_id: str,
+    question_id: str,
+    answer_text: str,
+    content_score: float,
+    feedback_text: str,
+) -> None:
+    """
+    Append an answer to the interview document in MongoDB.
+    Non-blocking — failures are logged but never crash the request.
+    """
+    try:
+        db = _get_db_service()
+        if not db.is_connected:
+            return
+
+        answer_record = {
+            "question_id": question_id,
+            "answer_text": answer_text,
+            "submitted_at": datetime.utcnow().isoformat(),
+            "content_score": content_score,
+            "feedback": feedback_text,
+        }
+        await db.add_answer_to_interview(session_id, answer_record)
+    except Exception as exc:
+        logger.error("[DB] _persist_answer_to_db failed | error={}", exc)
+
+
+async def _persist_feedback_to_db(
+    session_id: str,
+    question_id: str,
+    user_id: str,
+    feedback: AnswerFeedback,
+    communication: CommunicationAnalysis,
+) -> None:
+    """
+    Save detailed feedback to the feedback collection in MongoDB.
+    Non-blocking — failures are logged but never crash the request.
+    """
+    try:
+        db = _get_db_service()
+        if not db.is_connected:
+            return
+
+        feedback_doc = FeedbackDocument(
+            interview_id=session_id,
+            question_id=question_id,
+            user_id=user_id,
+            content_score=feedback.content_score,
+            communication_score=communication.confidence_score,
+            filler_words_detected=communication.filler_words_detected,
+            wpm=communication.speaking_pace_wpm or 0,
+            confidence_score=communication.confidence_score,
+            clarity_score=communication.clarity_score,
+            suggestions=feedback.improvements,
+            overall_score=feedback.overall_score,
+        )
+        await db.save_feedback(feedback_doc)
+    except Exception as exc:
+        logger.error("[DB] _persist_feedback_to_db failed | error={}", exc)
+
+
+async def _update_session_status_in_db(session_id: str, status: str) -> None:
+    """Update the interview status in MongoDB (e.g. on completion)."""
+    try:
+        db = _get_db_service()
+        if not db.is_connected:
+            return
+
+        update_data: Dict[str, Any] = {"status": status}
+        if status == InterviewStatus.COMPLETED.value:
+            update_data["completed_at"] = datetime.utcnow()
+
+        await db.update_interview(session_id, update_data)
+    except Exception as exc:
+        logger.error("[DB] _update_session_status_in_db failed | error={}", exc)
+
+
+async def _update_user_stats_in_db(user_id: str, overall_score: float) -> None:
+    """Update user stats and analytics in MongoDB after an interview completes."""
+    try:
+        db = _get_db_service()
+        if not db.is_connected:
+            return
+
+        await db.update_user_stats(user_id, overall_score)
+        await db.update_user_analytics(user_id, overall_score)
+        await db.update_admin_stats()
+    except Exception as exc:
+        logger.error("[DB] _update_user_stats_in_db failed | error={}", exc)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Interview Service
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -885,6 +1314,7 @@ class InterviewService:
         """
         Initialize a new interview session and return the first question.
         Uses Groq llama-3.3-70b-versatile to generate a tailored first question.
+        Persists the session to MongoDB for long-term storage.
         """
         session_id = str(uuid.uuid4())
         logger.info(
@@ -892,7 +1322,6 @@ class InterviewService:
             session_id, payload.user_id, payload.interview_type, payload.job_role,
         )
 
-        # ── Day 2: Real Groq question generation ──────────────────────────
         first_question_text = await _groq_generate_question(
             job_role=payload.job_role,
             interview_type=payload.interview_type,
@@ -906,8 +1335,6 @@ class InterviewService:
             topic=self._get_topic(payload.interview_type, 0),
         )
 
-        # Remaining questions come from the static bank (subsequent Groq calls
-        # happen per-answer in submit_answer so the user sees varied questions).
         fallback_questions = QUESTION_BANK.get(
             payload.interview_type, QUESTION_BANK[InterviewType.TECHNICAL]
         )
@@ -919,7 +1346,6 @@ class InterviewService:
             "job_role": payload.job_role,
             "difficulty": payload.difficulty,
             "resume_text": getattr(payload, "resume_text", None),
-            # Store the first Groq question at index-0; rest filled from bank
             "questions": [first_question_text] + fallback_questions[1:],
             "current_index": 0,
             "answers": [],
@@ -928,6 +1354,8 @@ class InterviewService:
         }
         _session_store[session_id] = session_data
         logger.debug("Session stored in memory: {}", session_id)
+
+        await _persist_interview_to_db(session_data)
 
         total_q = len(session_data["questions"])
         return StartInterviewResponse(
@@ -949,10 +1377,9 @@ class InterviewService:
         """
         Process a user's answer:
         1. Evaluate with Groq (content score + feedback).
-        2. Generate Groq follow-up question (stored as next question if applicable).
+        2. Generate Groq follow-up question.
         3. Advance session to the next question.
-
-        TODO (Day 3): Call Librosa for filler word / pacing detection if audio provided.
+        4. Persist answer + feedback to MongoDB (Day 5).
         """
         session = _session_store.get(payload.session_id)
         if not session:
@@ -975,15 +1402,15 @@ class InterviewService:
             payload.session_id, payload.question_id, len(payload.answer_text),
         )
 
-        # Store the answer (score added after evaluation below)
+        # Store the answer
         answer_record = {
             "question_id": payload.question_id,
             "answer_text": payload.answer_text,
-            "submitted_at": datetime.utcnow(),
+            "submitted_at": datetime.utcnow().isoformat(),
         }
         session["answers"].append(answer_record)
 
-        # ── Day 2: Real Groq answer evaluation ────────────────────────────
+        # FIX: Single evaluation call — was being called twice before (double API cost!)
         eval_result = await _groq_evaluate_answer(
             question=current_question_text,
             user_answer=payload.answer_text,
@@ -992,24 +1419,23 @@ class InterviewService:
         )
         content_score = eval_result["content_score"]
         groq_feedback = eval_result["feedback"]
-        # Save score back into answer record so session history can compute avg
         answer_record["overall_score"] = round(content_score * 0.95, 1)
 
-        # ── Day 2: Real Groq follow-up generation ─────────────────────────
+        # Generate follow-up question
         followup_text = await _groq_generate_followup(
             question=current_question_text,
             answer=payload.answer_text,
             content_score=content_score,
         )
 
-        # Build AnswerFeedback using Groq scores
         derived = round(content_score * 0.95, 1)
-        # ── Day 3: Real Voice Analysis (Google Cloud STT + Librosa) ───────────────
+
+        # ── Day 3: Voice Analysis (Google Cloud STT + Librosa) ────────────
         transcription_text: Optional[str] = None
         communication = CommunicationAnalysis(
             filler_words_count=0,
-            confidence_score=7.5,   # fallback — overwritten below if audio present
-            clarity_score=7.5,      # fallback
+            confidence_score=7.5,
+            clarity_score=7.5,
         )
 
         audio_url = getattr(payload, "audio_file_url", None)
@@ -1021,7 +1447,6 @@ class InterviewService:
             try:
                 transcribe_result, voice_result = await process_audio_url(audio_url)
 
-                # Prefer Whisper transcription over typed answer when available
                 if transcribe_result.success and transcribe_result.transcription:
                     transcription_text = transcribe_result.transcription
                     logger.info(
@@ -1051,7 +1476,6 @@ class InterviewService:
                     "falling back to mock scores",
                     payload.session_id, exc,
                 )
-                # communication already has mock 7.5 fallback values
         else:
             logger.debug(
                 "Voice | no audio_url | session={} | using mock scores",
@@ -1076,6 +1500,22 @@ class InterviewService:
             communication=communication,
         )
 
+        # ── Day 5: Persist answer + feedback to MongoDB ───────────────────
+        await _persist_answer_to_db(
+            session_id=payload.session_id,
+            question_id=payload.question_id,
+            answer_text=payload.answer_text,
+            content_score=content_score,
+            feedback_text=groq_feedback,
+        )
+        await _persist_feedback_to_db(
+            session_id=payload.session_id,
+            question_id=payload.question_id,
+            user_id=session["user_id"],
+            feedback=feedback,
+            communication=communication,
+        )
+
         # ── Advance to Next Question ───────────────────────────────────────
         session["current_index"] += 1
         questions = session["questions"]
@@ -1085,7 +1525,6 @@ class InterviewService:
         is_session_complete = next_q_index >= len(questions)
 
         if not is_session_complete:
-            # Inject the Groq follow-up as the upcoming question
             questions[next_q_index] = followup_text
             next_question = InterviewQuestion(
                 question_text=followup_text,
@@ -1095,6 +1534,11 @@ class InterviewService:
         else:
             session["status"] = SessionStatus.COMPLETED
             logger.info("Session completed: {}", payload.session_id)
+
+            await _update_session_status_in_db(
+                payload.session_id, InterviewStatus.COMPLETED.value
+            )
+            await _update_user_stats_in_db(session["user_id"], derived)
 
         return SubmitAnswerResponse(
             session_id=payload.session_id,
@@ -1115,8 +1559,47 @@ class InterviewService:
     # ── Session Retrieval ──────────────────────────────────────────────────
 
     async def get_session(self, session_id: str) -> Optional[dict]:
-        """Retrieve a session from the in-memory store."""
-        return _session_store.get(session_id)
+        """
+        Retrieve a session — check in-memory cache first, then MongoDB.
+        """
+        cached = _session_store.get(session_id)
+        if cached:
+            return cached
+
+        try:
+            db = _get_db_service()
+            if db.is_connected:
+                interview = await db.get_interview(session_id)
+                if interview:
+                    logger.debug("Session loaded from MongoDB: {}", session_id)
+                    return interview.model_dump()
+        except Exception as exc:
+            logger.error("get_session DB fallback failed | session_id={} | error={}", session_id, exc)
+
+        return None
+
+    # ── User Interview History (Day 5) ─────────────────────────────────────
+
+    async def get_user_interview_history(
+        self, user_id: str, limit: int = 20, skip: int = 0
+    ) -> List[Dict[str, Any]]:
+        """
+        Retrieve a user's interview history from MongoDB.
+        """
+        try:
+            db = _get_db_service()
+            if not db.is_connected:
+                logger.debug("get_user_interview_history skipped — DB not connected")
+                return []
+
+            interviews = await db.get_user_interviews(user_id, limit=limit, skip=skip)
+            return [interview.model_dump() for interview in interviews]
+        except Exception as exc:
+            logger.error(
+                "get_user_interview_history failed | user_id={} | error={}",
+                user_id, exc,
+            )
+            return []
 
     async def get_user_sessions(self, user_id: str) -> list:
         """Return all sessions for a given user_id from in-memory store."""
