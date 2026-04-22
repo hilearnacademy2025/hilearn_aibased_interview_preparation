@@ -159,4 +159,35 @@ export const healthCheck = async () => {
   return data
 }
 
+// ── Admin APIs ─────────────────────────────────────────────────────────────────
+export const getAdminDashboard = async () => {
+  const { data } = await api.get('/admin/dashboard')
+  return data
+}
+
+export const getAdminUsers = async (params = {}) => {
+  const { data } = await api.get('/admin/users', { params })
+  return data
+}
+
+export const updateAdminUser = async (userId, payload) => {
+  const { data } = await api.put(`/admin/users/${userId}`, payload)
+  return data
+}
+
+export const deleteAdminUser = async (userId) => {
+  const { data } = await api.delete(`/admin/users/${userId}`)
+  return data
+}
+
+export const getAdminInterviews = async (params = {}) => {
+  const { data } = await api.get('/admin/interviews', { params })
+  return data
+}
+
+export const getAdminAnalytics = async () => {
+  const { data } = await api.get('/admin/analytics')
+  return data
+}
+
 export default api

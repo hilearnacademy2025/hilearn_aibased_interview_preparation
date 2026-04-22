@@ -18,7 +18,7 @@ from loguru import logger
 
 from app.core.config import get_settings
 from app.core.exceptions import register_exception_handlers
-from app.api.routes import health, interview, auth
+from app.api.routes import health, interview, auth, admin
 
 # ─────────────────────────────────────────────────────────
 # Settings
@@ -177,6 +177,7 @@ AI-powered mock interview platform for Indian students and professionals.
         {"name": "Health", "description": "Liveness and readiness probes"},
         {"name": "Interview", "description": "Interview session management and AI feedback"},
         {"name": "Authentication", "description": "User signup, login, logout, and token management"},
+        {"name": "Admin", "description": "Admin panel endpoints for platform management"},
     ],
     lifespan=lifespan,
     docs_url="/docs",
@@ -211,6 +212,7 @@ register_exception_handlers(app)
 app.include_router(health.router, prefix="/api/v1")
 app.include_router(interview.router, prefix="/api/v1")
 app.include_router(auth.router, prefix="/api/v1")
+app.include_router(admin.router, prefix="/api/v1")
 
 
 # ─────────────────────────────────────────────────────────

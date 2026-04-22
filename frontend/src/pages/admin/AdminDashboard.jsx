@@ -1,27 +1,7 @@
 import { motion } from 'framer-motion'
-import { Users, Mic, TrendingUp, Award, ArrowUpRight, Activity } from 'lucide-react'
-
-const stats = [
-  { icon: Users,     label: 'Total Users',       value: '1,248',  trend: '+12%',  trendUp: true,  color: 'bg-[#0f1f3d]/8 text-[#0f1f3d]' },
-  { icon: Mic,       label: 'Interviews Today',   value: '87',     trend: '+5',    trendUp: true,  color: 'bg-[#c8601a]/10 text-[#c8601a]' },
-  { icon: TrendingUp,label: 'Avg Score',          value: '76%',    trend: '+2.4%', trendUp: true,  color: 'bg-green-50 text-green-700' },
-  { icon: Award,     label: 'Pro Subscribers',    value: '342',    trend: '+8',    trendUp: true,  color: 'bg-purple-50 text-purple-700' },
-]
-
-const recentUsers = [
-  { name: 'Aarav Sharma',   email: 'aarav@example.com',    role: 'user',  interviews: 5,  joined: 'Today' },
-  { name: 'Priya Patel',    email: 'priya@example.com',    role: 'pro',   interviews: 12, joined: 'Yesterday' },
-  { name: 'Rohan Mehta',    email: 'rohan@example.com',    role: 'user',  interviews: 3,  joined: '2 days ago' },
-  { name: 'Sneha Gupta',    email: 'sneha@example.com',    role: 'pro',   interviews: 21, joined: '3 days ago' },
-  { name: 'Kiran Verma',    email: 'kiran@example.com',    role: 'user',  interviews: 1,  joined: '4 days ago' },
-]
-
-const recentInterviews = [
-  { user: 'Aarav Sharma',   type: 'Technical',    score: 82, status: 'Completed' },
-  { user: 'Priya Patel',    type: 'HR Round',     score: 91, status: 'Completed' },
-  { user: 'Rohan Mehta',    type: 'System Design',score: 68, status: 'Completed' },
-  { user: 'Sneha Gupta',    type: 'Behavioral',   score: 88, status: 'Completed' },
-]
+import { useState, useEffect } from 'react'
+import { Users, Mic, TrendingUp, Award, ArrowUpRight, Activity, Loader2 } from 'lucide-react'
+import { getAdminDashboard } from '../../utils/api'
 
 function StatCard({ stat, index }) {
   const Icon = stat.icon
@@ -48,6 +28,42 @@ function StatCard({ stat, index }) {
 }
 
 export default function AdminDashboard() {
+  const [loading, setLoading] = useState(true)
+  const [dashData, setDashData] = useState(null)
+
+  useEffect(() => {
+    const fetchDashboard = async () => {
+      try {
+        const res = await getAdminDashboard()
+        setDashData(res.data)
+      } catch (err) {
+        console.error('Dashboard fetch failed:', err)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchDashboard()
+  }, [])
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="animate-spin text-[#c8601a]" size={32} />
+      </div>
+    )
+  }
+
+  const d = dashData || {}
+  const stats = [
+    { icon: Users,      label: 'Total Users',      value: (d.total_users || 0).toLocaleString(),      trend: 'Live', trendUp: true, color: 'bg-[#0f1f3d]/8 text-[#0f1f3d]' },
+    { icon: Mic,        label: 'Total Interviews',  value: (d.total_interviews || 0).toLocaleString(), trend: 'Live', trendUp: true, color: 'bg-[#c8601a]/10 text-[#c8601a]' },
+    { icon: TrendingUp, label: 'Avg Score',         value: `${d.average_score || 0}`,                 trend: 'Live', trendUp: true, color: 'bg-green-50 text-green-700' },
+    { icon: Award,      label: 'Platform',          value: 'Active',                                  trend: '✅',   trendUp: true, color: 'bg-purple-50 text-purple-700' },
+  ]
+
+  const recentUsers = d.recent_users || []
+  const recentInterviews = d.recent_interviews || []
+
   return (
     <div className="space-y-8">
       {/* Header */}
@@ -70,14 +86,14 @@ export default function AdminDashboard() {
             <h2 className="font-bold text-[#0f1f3d] flex items-center gap-2">
               <Users size={16} className="text-[#c8601a]" /> Recent Users
             </h2>
-            <span className="text-xs text-[#c8601a] font-semibold cursor-pointer hover:underline">View all →</span>
           </div>
           <div className="space-y-3">
+            {recentUsers.length === 0 && <p className="text-sm text-[#9c9a96]">No users yet.</p>}
             {recentUsers.map((u) => (
               <div key={u.email} className="flex items-center justify-between py-2 border-b border-[#f4f2ee] last:border-0">
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 rounded-full bg-[#0f1f3d]/8 flex items-center justify-center text-[#0f1f3d] font-bold text-sm">
-                    {u.name[0]}
+                    {(u.name || '?')[0]}
                   </div>
                   <div>
                     <p className="text-sm font-semibold text-[#0f1f3d]">{u.name}</p>
@@ -85,10 +101,10 @@ export default function AdminDashboard() {
                   </div>
                 </div>
                 <div className="text-right">
-                  <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${u.role === 'pro' ? 'bg-[#c8601a]/10 text-[#c8601a]' : 'bg-[#f4f2ee] text-[#9c9a96]'}`}>
-                    {u.role.toUpperCase()}
+                  <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${u.role === 'admin' ? 'bg-[#c8601a]/10 text-[#c8601a]' : 'bg-[#f4f2ee] text-[#9c9a96]'}`}>
+                    {(u.role || 'student').toUpperCase()}
                   </span>
-                  <p className="text-xs text-[#9c9a96] mt-1">{u.joined}</p>
+                  <p className="text-xs text-[#9c9a96] mt-1">{u.interview_count || 0} interviews</p>
                 </div>
               </div>
             ))}
@@ -101,9 +117,9 @@ export default function AdminDashboard() {
             <h2 className="font-bold text-[#0f1f3d] flex items-center gap-2">
               <Activity size={16} className="text-[#c8601a]" /> Recent Interviews
             </h2>
-            <span className="text-xs text-[#c8601a] font-semibold cursor-pointer hover:underline">View all →</span>
           </div>
           <div className="space-y-3">
+            {recentInterviews.length === 0 && <p className="text-sm text-[#9c9a96]">No interviews yet.</p>}
             {recentInterviews.map((iv, i) => (
               <div key={i} className="flex items-center justify-between py-2 border-b border-[#f4f2ee] last:border-0">
                 <div>
