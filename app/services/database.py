@@ -1024,7 +1024,11 @@ class DatabaseService:
             return None
 
         try:
-            doc = await db.users.find_one({"email": email.lower().strip()})
+            import re as _re
+            clean_email = email.lower().strip()
+            doc = await db.users.find_one({
+                "email": {"$regex": f"^{_re.escape(clean_email)}$", "$options": "i"}
+            })
             if doc:
                 # FIX: purane users mein 'hashed_password' tha, naye mein 'password_hash'
                 if "hashed_password" in doc and "password_hash" not in doc:
