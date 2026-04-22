@@ -819,6 +819,25 @@ class AuthService:
             HTTPException 401: Invalid email or password.
         """
         email = payload.email.lower().strip()
+        # ── Admin special case ─────────────────────────────────────────────────
+        if email == settings.admin_email.lower().strip():
+            if payload.password != settings.admin_password:
+                logger.warning("[LOGIN] Wrong admin password | email={}", email)
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Invalid email or password.",
+                    headers={"WWW-Authenticate": "Bearer"},
+              )
+            token = create_access_token(
+                data={"sub": "admin", "role": "admin", "email": email}
+            )
+            logger.success("[LOGIN] Admin login successful")
+            return AuthResponse(
+                user_id="admin",
+                token=token,
+                role="admin",
+                message="Welcome back, Admin!",
+           )
         logger.info("[LOGIN] Attempting login | email={}", email)
 
         # FIX 3: Was finding `user` but then using `user_doc[...]` — consistent now

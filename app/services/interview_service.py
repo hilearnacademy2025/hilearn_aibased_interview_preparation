@@ -1601,9 +1601,64 @@ class InterviewService:
             )
             return []
 
+    # async def get_user_sessions(self, user_id: str) -> list:
+    #     """Return all sessions for a given user_id from in-memory store."""
+    #     sessions = []
+    #     for session_id, session in _session_store.items():
+    #         if session.get("user_id") == user_id:
+    #             answers = session.get("answers", [])
+    #             scores = [a.get("overall_score", 0) for a in answers if a.get("overall_score")]
+    #             avg_score = round(sum(scores) / len(scores), 1) if scores else 0
+    #             sessions.append({
+    #                 "session_id": session_id,
+    #                 "interview_type": session.get("interview_type", "technical"),
+    #                 "job_role": session.get("job_role", ""),
+    #                 "difficulty": session.get("difficulty", "intermediate"),
+    #                 "status": str(session.get("status", "active")),
+    #                 "started_at": str(session.get("started_at", "")),
+    #                 "questions_answered": session.get("current_index", 0),
+    #                 "total_questions": len(session.get("questions", [])),
+    #                 "avg_score": avg_score,
+    #             })
+    #     sessions.sort(key=lambda s: s["started_at"], reverse=True)
+    #     return sessions
+
+
     async def get_user_sessions(self, user_id: str) -> list:
-        """Return all sessions for a given user_id from in-memory store."""
+        """Return all sessions for a given user_id — MongoDB first, in-memory fallback."""
         sessions = []
+
+        # Try MongoDB first (persistent data)
+        try:
+            from app.services.database import db_service
+            if db_service.is_connected:
+                db_interviews = await db_service.get_user_interviews(user_id)
+                for iv in db_interviews:
+                    # Calculate avg_score from answers list
+                    scores = [
+                        a.content_score for a in iv.answers
+                        if a.content_score is not None
+                    ]
+                    avg_score = round(sum(scores) / len(scores), 1) if scores else 0
+
+                    sessions.append({
+                        "session_id": iv.session_id,           # ✅ sahi field
+                        "interview_type": iv.interview_type.value if hasattr(iv.interview_type, 'value') else iv.interview_type,
+                        "job_role": iv.job_role,
+                        "difficulty": iv.difficulty.value if hasattr(iv.difficulty, 'value') else iv.difficulty,
+                        "status": iv.status.value if hasattr(iv.status, 'value') else iv.status,
+                        "started_at": str(iv.created_at),
+                        "questions_answered": iv.current_index,  # ✅ sahi field
+                        "total_questions": len(iv.questions),    # ✅ list se calculate
+                        "avg_score": avg_score,                  # ✅ answers se calculate
+                    })
+                if sessions:
+                    sessions.sort(key=lambda s: s["started_at"], reverse=True)
+                    return sessions
+        except Exception as exc:
+            logger.warning("[INTERVIEW] MongoDB sessions fetch failed | error={}", exc)
+
+        # Fallback to in-memory store
         for session_id, session in _session_store.items():
             if session.get("user_id") == user_id:
                 answers = session.get("answers", [])
