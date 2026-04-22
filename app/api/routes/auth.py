@@ -156,7 +156,10 @@ async def logout(
         401: {"description": "Invalid, expired, or blacklisted token"},
     },
 )
-async def refresh_token(payload: TokenRefreshRequest) -> TokenResponse:
+async def refresh_token(
+    user: Dict[str, Any] = Depends(get_current_user),
+    credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer()),
+) -> TokenResponse:
     """
     Refresh an access token.
 
@@ -165,8 +168,9 @@ async def refresh_token(payload: TokenRefreshRequest) -> TokenResponse:
     2. Blacklist the old token
     3. Issue a new token with same claims but fresh expiry
     """
-    logger.info("[AUTH-ROUTE] POST /auth/refresh-token")
-    return await auth_service.refresh_token(payload.token)
+    token = credentials.credentials
+    logger.info("[AUTH-ROUTE] POST /auth/refresh-token | user_id={}", user.get("sub", "unknown"))
+    return await auth_service.refresh_token(token)
 
 
 # ─────────────────────────────────────────────────────────

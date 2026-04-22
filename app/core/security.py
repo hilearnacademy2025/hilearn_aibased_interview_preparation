@@ -157,7 +157,7 @@ async def get_current_user(
 
     # Check if the token has been blacklisted (logged out)
     from app.services.auth_service import auth_service
-    if auth_service.is_token_blacklisted(token):
+    if await auth_service.is_token_blacklisted(token):
         logger.warning("Blocked blacklisted token")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
