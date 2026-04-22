@@ -205,3 +205,94 @@ async def get_me(
     user_id = user.get("sub")
     logger.info("[AUTH-ROUTE] GET /auth/me | user_id={}", user_id)
     return await auth_service.get_profile(user_id)
+
+
+# ─────────────────────────────────────────────────────────
+# PUT /auth/profile
+# ─────────────────────────────────────────────────────────
+@router.put(
+    "/profile",
+    response_model=APIResponse,
+    summary="Update User Profile",
+    description="Update profile fields or change password.",
+    responses={
+        200: {"description": "Profile updated successfully"},
+        400: {"description": "Invalid request"},
+        401: {"description": "Missing or invalid token"},
+    },
+)
+async def update_profile(
+    payload: Dict[str, Any],
+    user: Dict[str, Any] = Depends(get_current_user),
+) -> APIResponse:
+    from app.services.database import db_service
+    from app.services.auth_service import _user_store
+    from app.core.security import verify_password, hash_password
+
+    user_id = user.get("sub")
+    logger.info("[AUTH-ROUTE] PUT /auth/profile | user_id={}", user_id)
+
+    # ── Password Change Request ────────────────────────────────────────────
+    if "current_password" in payload or "new_password" in payload:
+        current_pw = payload.get("current_password", "")
+        new_pw = payload.get("new_password", "")
+
+        if not current_pw or not new_pw:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Both current_password and new_password are required.",
+            )
+
+        # Get user from cache or DB
+        cached_user = _user_store.get(user_id)
+        if not cached_user:
+            from app.services.auth_service import auth_service
+            cached_user = await auth_service._get_user_from_db_by_id(user_id)
+
+        if not cached_user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="User not found.",
+            )
+
+        # Verify current password
+        if not verify_password(current_pw, cached_user.hashed_password):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Current password is incorrect.",
+            )
+
+        # Hash new password and save
+        new_hashed = hash_password(new_pw)
+        if db_service.is_connected:
+            await db_service.update_user(user_id, {"password_hash": new_hashed})
+
+        # Update in-memory cache
+        if cached_user:
+            cached_user.hashed_password = new_hashed
+
+        return APIResponse(message="Password updated successfully.")
+
+    # ── Profile Fields Update ──────────────────────────────────────────────
+    allowed_fields = {"name", "phone", "location", "target_role", "bio"}
+    update_data = {k: v for k, v in payload.items() if k in allowed_fields and v is not None}
+
+    if not update_data:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No valid fields to update.",
+        )
+
+    updated = False
+    if db_service.is_connected:
+        updated = await db_service.update_user(user_id, update_data)
+
+    # Update in-memory cache
+    cached_user = _user_store.get(user_id)
+    if cached_user and "name" in update_data:
+        cached_user.name = update_data["name"]
+
+    return APIResponse(
+        message="Profile updated successfully." if updated else "Profile saved (DB not connected).",
+        data={"updated_fields": list(update_data.keys())},
+    )

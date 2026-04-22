@@ -967,6 +967,31 @@ QUESTION_BANK = {
     ],
 }
 
+async def _groq_detect_role_from_resume(resume_text: str) -> str:
+    """Resume se job role automatically detect karo using Groq."""
+    prompt = (
+        f"Based on this resume text, what is the most appropriate job role for this candidate?\n\n"
+        f"Resume: {resume_text[:800]}\n\n"
+        "Return ONLY the job role title (e.g. 'Frontend Developer', 'Data Scientist'). "
+        "No explanation, no punctuation, just the role title."
+    )
+    try:
+        client = _get_groq_client()
+        response = await client.chat.completions.create(
+            model=settings.groq_model,
+            messages=[
+                {"role": "system", "content": "You extract job roles from resumes. Return only the job title."},
+                {"role": "user", "content": prompt},
+            ],
+            max_tokens=20,
+            temperature=0.1,
+        )
+        role = response.choices[0].message.content.strip()
+        logger.info("Groq | detect_role_from_resume | detected={}", role)
+        return role
+    except Exception as exc:
+        logger.error("Groq | detect_role_from_resume | FAILED | error={}", exc)
+        return "Software Engineer"
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Groq Helper: 1 – Generate Interview Question
@@ -1321,6 +1346,14 @@ class InterviewService:
             "Starting interview | session={} | user={} | type={} | role={}",
             session_id, payload.user_id, payload.interview_type, payload.job_role,
         )
+
+        # ── Resume se job_role auto-detect  adddd────────────────────────
+        resume = getattr(payload, "resume_text", None)
+        if not payload.job_role and resume:
+            # Groq se role detect karwao
+            payload.job_role = await _groq_detect_role_from_resume(resume)
+        elif not payload.job_role:
+           payload.job_role = "Software Engineer"  # default fallback
 
         first_question_text = await _groq_generate_question(
             job_role=payload.job_role,

@@ -33,6 +33,7 @@ import UserInterview from '../pages/user/UserInterview'
 import UserAnalytics from '../pages/user/UserAnalytics'
 import UserFeedback from '../pages/user/UserFeedback'
 import UserSettings from '../pages/user/UserSettings'
+// import ResumeUpload from '../pages/ResumeUpload'
 
 function Spinner() {
   return (
@@ -79,32 +80,33 @@ export default function AppRoutes() {
         <Routes location={location} key={location.pathname}>
 
           {/* ── Public ── */}
-          <Route path="/"         element={<PublicShell><Home /></PublicShell>} />
+          <Route path="/" element={<PublicShell><Home /></PublicShell>} />
           <Route path="/features" element={<PublicShell><Features /></PublicShell>} />
           <Route path="/dashboard" element={<PublicShell><Dashboard /></PublicShell>} />
           <Route path="/interview" element={<PublicShell><Interview /></PublicShell>} />
-          <Route path="/about"    element={<PublicShell><About /></PublicShell>} />
-          <Route path="/pricing"  element={<PublicShell><PricingPage /></PublicShell>} />
-          <Route path="/login"    element={<PublicShell><Login /></PublicShell>} />
-          <Route path="/signup"   element={<PublicShell><Signup /></PublicShell>} />
+          <Route path="/about" element={<PublicShell><About /></PublicShell>} />
+          <Route path="/pricing" element={<PublicShell><PricingPage /></PublicShell>} />
+          <Route path="/login" element={<PublicShell><Login /></PublicShell>} />
+          <Route path="/signup" element={<PublicShell><Signup /></PublicShell>} />
 
           {/* ── Admin ── */}
           <Route path="/admin" element={<RequireAdmin><AdminLayout /></RequireAdmin>}>
-            <Route index                element={<AdminDashboard />} />
-            <Route path="users"         element={<AdminUsers />} />
-            <Route path="interviews"    element={<AdminInterviews />} />
-            <Route path="analytics"     element={<AdminAnalytics />} />
-            <Route path="settings"      element={<AdminSettings />} />
+            <Route index element={<AdminDashboard />} />
+            <Route path="users" element={<AdminUsers />} />
+            <Route path="interviews" element={<AdminInterviews />} />
+            <Route path="analytics" element={<AdminAnalytics />} />
+            <Route path="settings" element={<AdminSettings />} />
           </Route>
 
           {/* ── User ── */}
           <Route path="/user" element={<RequireUser><UserLayout /></RequireUser>}>
-            <Route index                    element={<UserDashboard />} />
-            <Route path="interview-setup"   element={<UserInterviewSetup />} />
-            <Route path="interview"         element={<UserInterview />} />
-            <Route path="analytics"         element={<UserAnalytics />} />
-            <Route path="feedback"          element={<UserFeedback />} />
-            <Route path="settings"          element={<UserSettings />} />
+            <Route index element={<UserDashboard />} />
+            <Route path="interview-setup" element={<UserInterviewSetup />} />
+            <Route path="interview" element={<UserInterview />} />
+            <Route path="analytics" element={<UserAnalytics />} />
+            <Route path="feedback" element={<UserFeedback />} />
+            <Route path="settings" element={<UserSettings />} />
+            {/* <Route path="resume-upload" element={<ResumeUpload />} /> */}
           </Route>
 
           {/* ── 404 ── */}

@@ -73,11 +73,17 @@ class StartInterviewRequest(BaseModel):
         default=InterviewType.TECHNICAL,
         description="Type of interview: technical, behavioral, hr, domain_specific",
     )
-    job_role: str = Field(
-        ...,
-        min_length=2,
+    # job_role: str = Field(
+    #     ...,
+    #     min_length=2,
+    #     max_length=100,
+    #     description="Target job role, e.g. 'Backend Engineer', 'Data Scientist'",
+    #     examples=["Backend Engineer"],
+    # )
+    job_role: Optional[str] = Field(
+        default=None,
         max_length=100,
-        description="Target job role, e.g. 'Backend Engineer', 'Data Scientist'",
+        description="Target job role. If not provided, auto-detected from resume.",
         examples=["Backend Engineer"],
     )
     tech_stack: Optional[List[str]] = Field(

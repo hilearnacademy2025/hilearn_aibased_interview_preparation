@@ -12,6 +12,7 @@ const userNavItems = [
     items: [
       { icon: LayoutDashboard, label: 'Dashboard',       href: '/user' },
       { icon: Mic,             label: 'Mock Interviews', href: '/user/interview-setup' },
+      // { icon: FileUp,          label: 'Upload Resume',   href: '/user/resume-upload' },
       { icon: BarChart3,       label: 'My Progress',     href: '/user/analytics' },
       { icon: Award,           label: 'My Feedback',     href: '/user/feedback' },
     ],
