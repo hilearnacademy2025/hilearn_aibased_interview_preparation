@@ -1002,18 +1002,29 @@ async def _groq_generate_question(
     interview_type: InterviewType,
     difficulty: DifficultyLevel,
     resume_text: Optional[str] = None,
+    parsed_resume: Optional[dict] = None,
 ) -> str:
     """
     Call Groq llama-3.3-70b-versatile to generate a single interview question.
 
+    If resume data is available, uses structured resume context (skills,
+    experience, companies, tech stack) for personalized question generation.
+
     Returns the question as a plain string.
     Falls back to the static question bank on any error.
     """
-    resume_context = (
-        f" The candidate's resume summary: {resume_text[:500]}"
-        if resume_text
-        else ""
-    )
+    # Build rich resume context from parsed data or raw text
+    resume_context = ""
+    if parsed_resume and any(parsed_resume.get(k) for k in ["skills", "tech_stack", "companies"]):
+        from app.services.resume_service import build_resume_context_prompt
+        resume_context = build_resume_context_prompt(parsed_resume)
+    elif resume_text and len(resume_text.strip()) > 20:
+        resume_context = (
+            f"\n\nCandidate Resume Context:\n{resume_text[:600]}\n\n"
+            "Generate a specific question that tests their actual experience and skills "
+            "mentioned in their resume."
+        )
+
     prompt = (
         f"Generate ONE interview question for a {job_role} ({interview_type.value}) "
         f"at {difficulty.value} difficulty level.{resume_context} "
@@ -1021,8 +1032,8 @@ async def _groq_generate_question(
     )
 
     logger.info(
-        "Groq | generate_question | role={} | type={} | difficulty={}",
-        job_role, interview_type.value, difficulty.value,
+        "Groq | generate_question | role={} | type={} | difficulty={} | has_resume={}",
+        job_role, interview_type.value, difficulty.value, bool(resume_context),
     )
 
     try:
@@ -1034,7 +1045,10 @@ async def _groq_generate_question(
                     "role": "system",
                     "content": (
                         "You are an expert technical interviewer at a top-tier tech company. "
-                        "Generate concise, relevant interview questions. Return ONLY the question."
+                        "Generate concise, relevant interview questions. "
+                        "If resume context is provided, tailor the question to the candidate's "
+                        "actual skills, projects, and experience. "
+                        "Return ONLY the question."
                     ),
                 },
                 {"role": "user", "content": prompt},
@@ -1322,6 +1336,129 @@ async def _update_user_stats_in_db(user_id: str, overall_score: float) -> None:
         await db.update_admin_stats()
     except Exception as exc:
         logger.error("[DB] _update_user_stats_in_db failed | error={}", exc)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Groq Helper: MCQ Question Generation
+# ─────────────────────────────────────────────────────────────────────────────
+
+async def _groq_generate_mcq_question(
+    job_role: str,
+    interview_type: InterviewType,
+    difficulty: DifficultyLevel,
+    question_number: int = 1,
+    previous_questions: Optional[List[str]] = None,
+    resume_text: Optional[str] = None,
+    parsed_resume: Optional[dict] = None,
+) -> dict:
+    """
+    Generate a single MCQ question with 4 options, correct answer, and explanation.
+
+    Uses Groq AI to produce the question in structured JSON format.
+    Falls back to a hardcoded sample MCQ on failure.
+
+    Returns:
+        dict with keys: question_text, option_a, option_b, option_c, option_d,
+        correct_answer (A/B/C/D), explanation
+    """
+    # Build resume context if available
+    resume_context = ""
+    if parsed_resume and any(parsed_resume.get(k) for k in ["skills", "tech_stack", "companies"]):
+        from app.services.resume_service import build_resume_context_prompt
+        resume_context = build_resume_context_prompt(parsed_resume)
+    elif resume_text and len(resume_text.strip()) > 20:
+        resume_context = f"\nCandidate Resume: {resume_text[:400]}\nTailor the question to their skills."
+
+    # Build avoid-duplicates context
+    avoid_ctx = ""
+    if previous_questions:
+        avoid_ctx = "\n\nAvoid these topics (already asked):\n" + "\n".join(
+            f"- {q[:60]}" for q in previous_questions[-5:]
+        )
+
+    prompt = (
+        f"Generate ONE multiple-choice question (MCQ) for a {job_role} "
+        f"({interview_type.value} interview) at {difficulty.value} difficulty. "
+        f"This is question #{question_number}.{resume_context}{avoid_ctx}\n\n"
+        "Return ONLY valid JSON with these exact keys:\n"
+        '{"question_text": "...", "option_a": "...", "option_b": "...", '
+        '"option_c": "...", "option_d": "...", "correct_answer": "A/B/C/D", '
+        '"explanation": "Why this is the correct answer"}\n\n'
+        "Rules:\n"
+        "- Make all 4 options plausible (no obvious wrong answers)\n"
+        "- The explanation should be educational and concise (2-3 sentences)\n"
+        "- Vary the correct answer position (don't always make it A)"
+    )
+
+    logger.info(
+        "Groq | generate_mcq | role={} | type={} | difficulty={} | q#={}",
+        job_role, interview_type.value, difficulty.value, question_number,
+    )
+
+    try:
+        client = _get_groq_client()
+        response = await client.chat.completions.create(
+            model=settings.groq_model,
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You are an expert interviewer creating multiple-choice questions. "
+                        "Always respond with valid JSON only — no markdown fences, no explanation outside JSON."
+                    ),
+                },
+                {"role": "user", "content": prompt},
+            ],
+            max_tokens=400,
+            temperature=0.7,
+        )
+
+        raw = response.choices[0].message.content.strip()
+
+        # Strip markdown code fences if present
+        if raw.startswith("```"):
+            raw = raw.split("```")[1]
+            if raw.startswith("json"):
+                raw = raw[4:]
+            raw = raw.strip()
+
+        import json
+        mcq_data = json.loads(raw)
+
+        # Validate required keys
+        required = ["question_text", "option_a", "option_b", "option_c", "option_d", "correct_answer"]
+        for key in required:
+            if key not in mcq_data:
+                raise ValueError(f"Missing key in MCQ response: {key}")
+
+        # Normalize correct_answer to uppercase
+        mcq_data["correct_answer"] = mcq_data["correct_answer"].upper().strip()
+        if mcq_data["correct_answer"] not in ("A", "B", "C", "D"):
+            mcq_data["correct_answer"] = "A"
+
+        if "explanation" not in mcq_data:
+            mcq_data["explanation"] = "The correct answer demonstrates the key concept being tested."
+
+        logger.success(
+            "Groq | generate_mcq | OK | tokens={} | correct={}",
+            response.usage.total_tokens, mcq_data["correct_answer"],
+        )
+        return mcq_data
+
+    except Exception as exc:
+        logger.error("Groq | generate_mcq | FAILED | error={} | using fallback", exc)
+        return {
+            "question_text": f"What is the primary role of a {job_role} in software development?",
+            "option_a": "Writing documentation only",
+            "option_b": "Designing, building, and maintaining software systems",
+            "option_c": "Managing project timelines",
+            "option_d": "Conducting user interviews",
+            "correct_answer": "B",
+            "explanation": (
+                "A software engineer's primary role is to design, build, and maintain "
+                "software systems that solve real-world problems."
+            ),
+        }
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1735,6 +1872,337 @@ class InterviewService:
         }
         topic_list = topics.get(interview_type, ["General"])
         return topic_list[index % len(topic_list)]
+
+    # ── MCQ: Start Session ────────────────────────────────────────────────
+
+    async def start_mcq_session(self, payload) -> dict:
+        """
+        Initialize a new MCQ interview session.
+
+        Generates the first MCQ question via Groq and stores the session
+        in both in-memory cache and MongoDB.
+
+        Args:
+            payload: StartMCQRequest with user_id, job_role, difficulty, etc.
+
+        Returns:
+            dict with session_id, first_question, total_questions, etc.
+        """
+        from app.models.schemas import MCQQuestion
+
+        session_id = str(uuid.uuid4())
+        logger.info(
+            "Starting MCQ session | session={} | user={} | type={} | role={}",
+            session_id, payload.user_id, payload.interview_type, payload.job_role,
+        )
+
+        # Auto-detect role from resume if not provided
+        resume_text = getattr(payload, "resume_text", None)
+        if not payload.job_role and resume_text:
+            payload.job_role = await _groq_detect_role_from_resume(resume_text)
+        elif not payload.job_role:
+            payload.job_role = "Software Engineer"
+
+        # Parse resume for structured context
+        parsed_resume = None
+        if resume_text and len(resume_text.strip()) > 20:
+            try:
+                from app.services.resume_service import parse_resume_structured
+                parsed_resume = await parse_resume_structured(resume_text)
+            except Exception as exc:
+                logger.warning("MCQ | Resume parsing failed | error={}", exc)
+
+        # Generate first MCQ question
+        mcq_data = await _groq_generate_mcq_question(
+            job_role=payload.job_role,
+            interview_type=payload.interview_type,
+            difficulty=payload.difficulty,
+            question_number=1,
+            resume_text=resume_text,
+            parsed_resume=parsed_resume,
+        )
+
+        first_question = MCQQuestion(
+            question_text=mcq_data["question_text"],
+            option_a=mcq_data["option_a"],
+            option_b=mcq_data["option_b"],
+            option_c=mcq_data["option_c"],
+            option_d=mcq_data["option_d"],
+            correct_answer=mcq_data["correct_answer"],
+            explanation=mcq_data["explanation"],
+        )
+
+        num_questions = getattr(payload, "num_questions", 10)
+
+        # Store session in memory
+        session_data = {
+            "session_id": session_id,
+            "user_id": payload.user_id,
+            "interview_type": payload.interview_type,
+            "job_role": payload.job_role,
+            "difficulty": payload.difficulty,
+            "resume_text": resume_text,
+            "parsed_resume": parsed_resume,
+            "is_mcq": True,
+            "num_questions": num_questions,
+            "mcq_questions": [first_question.model_dump()],
+            "mcq_answers": [],
+            "current_index": 0,
+            "total_score": 0,
+            "status": SessionStatus.ACTIVE,
+            "started_at": datetime.utcnow(),
+        }
+        _session_store[session_id] = session_data
+
+        # Persist to MongoDB
+        try:
+            db = _get_db_service()
+            if db.is_connected:
+                interview_doc = InterviewDocument(
+                    session_id=session_id,
+                    user_id=payload.user_id,
+                    interview_type=payload.interview_type.value,
+                    difficulty=payload.difficulty.value,
+                    job_role=payload.job_role,
+                    questions=[],
+                    answers=[],
+                    current_index=0,
+                    status=InterviewStatus.ACTIVE,
+                    resume_text=resume_text,
+                    mcq_questions=[first_question.model_dump()],
+                    mcq_answers=[],
+                    created_at=session_data["started_at"],
+                )
+                await db.create_interview(interview_doc)
+        except Exception as exc:
+            logger.error("[MCQ] DB persist failed | error={}", exc)
+
+        return {
+            "session_id": session_id,
+            "user_id": payload.user_id,
+            "interview_type": payload.interview_type,
+            "job_role": payload.job_role,
+            "difficulty": payload.difficulty,
+            "first_question": first_question,
+            "total_questions": num_questions,
+            "started_at": session_data["started_at"],
+        }
+
+    # ── MCQ: Submit Answer ────────────────────────────────────────────────
+
+    async def submit_mcq_answer(self, payload) -> dict:
+        """
+        Evaluate an MCQ answer and return result + next question.
+
+        Args:
+            payload: SubmitMCQRequest with session_id, question_id, answer.
+
+        Returns:
+            dict with is_correct, correct_answer, explanation, score,
+            next_question, session_complete, etc.
+        """
+        from app.models.schemas import MCQQuestion
+
+        session = _session_store.get(payload.session_id)
+        if not session:
+            from fastapi import HTTPException
+            raise HTTPException(
+                status_code=404,
+                detail=f"MCQ session '{payload.session_id}' not found.",
+            )
+
+        if not session.get("is_mcq"):
+            from fastapi import HTTPException
+            raise HTTPException(
+                status_code=400,
+                detail="This is not an MCQ session.",
+            )
+
+        if session["status"] != SessionStatus.ACTIVE:
+            from fastapi import HTTPException
+            raise HTTPException(
+                status_code=400,
+                detail=f"Session is {session['status'].value}. Only active sessions accept answers.",
+            )
+
+        # Get current question
+        current_idx = session["current_index"]
+        mcq_questions = session["mcq_questions"]
+
+        if current_idx >= len(mcq_questions):
+            from fastapi import HTTPException
+            raise HTTPException(
+                status_code=400,
+                detail="No more questions to answer.",
+            )
+
+        current_q = mcq_questions[current_idx]
+        user_answer = payload.answer.upper().strip()
+        correct_answer = current_q["correct_answer"].upper()
+        is_correct = user_answer == correct_answer
+        score = 10 if is_correct else 0
+
+        logger.info(
+            "MCQ answer | session={} | q#{} | user={} | correct={} | is_correct={}",
+            payload.session_id, current_idx + 1, user_answer, correct_answer, is_correct,
+        )
+
+        # Record answer
+        answer_record = {
+            "question_id": payload.question_id,
+            "user_answer": user_answer,
+            "correct_answer": correct_answer,
+            "is_correct": is_correct,
+            "score": score,
+            "submitted_at": datetime.utcnow().isoformat(),
+            "explanation": current_q.get("explanation", ""),
+        }
+        session["mcq_answers"].append(answer_record)
+        session["total_score"] += score
+        session["current_index"] += 1
+
+        # Persist MCQ answer to DB
+        try:
+            db = _get_db_service()
+            if db.is_connected:
+                await db.add_mcq_answer_to_interview(payload.session_id, answer_record)
+        except Exception as exc:
+            logger.error("[MCQ] DB persist answer failed | error={}", exc)
+
+        # Check if session is complete
+        num_questions = session["num_questions"]
+        next_idx = session["current_index"]
+        session_complete = next_idx >= num_questions
+
+        next_question = None
+        if not session_complete:
+            # Generate next MCQ question
+            previous_qs = [q["question_text"] for q in mcq_questions]
+            mcq_data = await _groq_generate_mcq_question(
+                job_role=session["job_role"],
+                interview_type=session["interview_type"],
+                difficulty=session["difficulty"],
+                question_number=next_idx + 1,
+                previous_questions=previous_qs,
+                resume_text=session.get("resume_text"),
+                parsed_resume=session.get("parsed_resume"),
+            )
+
+            next_question = MCQQuestion(
+                question_text=mcq_data["question_text"],
+                option_a=mcq_data["option_a"],
+                option_b=mcq_data["option_b"],
+                option_c=mcq_data["option_c"],
+                option_d=mcq_data["option_d"],
+                correct_answer=mcq_data["correct_answer"],
+                explanation=mcq_data["explanation"],
+            )
+            session["mcq_questions"].append(next_question.model_dump())
+
+            # Persist new question to DB
+            try:
+                db = _get_db_service()
+                if db.is_connected:
+                    await db.update_interview(
+                        payload.session_id,
+                        {"mcq_questions": [q for q in session["mcq_questions"]]},
+                    )
+            except Exception as exc:
+                logger.error("[MCQ] DB persist question failed | error={}", exc)
+        else:
+            # Session complete
+            session["status"] = SessionStatus.COMPLETED
+            logger.info("MCQ session completed: {} | score={}/{}", 
+                        payload.session_id, session["total_score"], num_questions * 10)
+
+            await _update_session_status_in_db(
+                payload.session_id, InterviewStatus.COMPLETED.value
+            )
+            await _update_user_stats_in_db(
+                session["user_id"],
+                round(session["total_score"] / max(num_questions, 1), 1),
+            )
+
+        message = (
+            "✅ Correct! Great job!" if is_correct
+            else f"❌ Incorrect. The correct answer is {correct_answer}."
+        )
+        if session_complete:
+            message = f"🎉 MCQ complete! Score: {session['total_score']}/{num_questions * 10}"
+
+        return {
+            "session_id": payload.session_id,
+            "question_id": payload.question_id,
+            "user_answer": user_answer,
+            "is_correct": is_correct,
+            "correct_answer": correct_answer,
+            "explanation": current_q.get("explanation", ""),
+            "score": score,
+            "next_question": next_question,
+            "questions_answered": next_idx,
+            "total_questions": num_questions,
+            "session_complete": session_complete,
+            "total_score": session["total_score"],
+            "message": message,
+        }
+
+    # ── MCQ: Get Session ──────────────────────────────────────────────────
+
+    async def get_mcq_session(self, session_id: str) -> Optional[dict]:
+        """
+        Retrieve MCQ session details.
+
+        Args:
+            session_id: The MCQ session ID.
+
+        Returns:
+            dict with full session details, or None if not found.
+        """
+        session = _session_store.get(session_id)
+
+        if not session:
+            try:
+                db = _get_db_service()
+                if db.is_connected:
+                    interview = await db.get_interview(session_id)
+                    if interview:
+                        return {
+                            "session_id": interview.session_id,
+                            "user_id": interview.user_id,
+                            "interview_type": interview.interview_type.value if hasattr(interview.interview_type, 'value') else str(interview.interview_type),
+                            "job_role": interview.job_role,
+                            "difficulty": interview.difficulty.value if hasattr(interview.difficulty, 'value') else str(interview.difficulty),
+                            "status": interview.status.value if hasattr(interview.status, 'value') else str(interview.status),
+                            "total_questions": len(interview.mcq_questions) if interview.mcq_questions else 10,
+                            "questions_answered": len(interview.mcq_answers),
+                            "total_score": sum(a.get("score", 0) for a in interview.mcq_answers),
+                            "max_score": len(interview.mcq_questions) * 10 if interview.mcq_questions else 100,
+                            "questions": interview.mcq_questions or [],
+                            "answers": interview.mcq_answers or [],
+                            "created_at": str(interview.created_at) if interview.created_at else None,
+                            "completed_at": str(interview.completed_at) if interview.completed_at else None,
+                        }
+            except Exception as exc:
+                logger.error("[MCQ] get_mcq_session DB fallback failed | error={}", exc)
+            return None
+
+        num_q = session.get("num_questions", 10)
+        return {
+            "session_id": session["session_id"],
+            "user_id": session["user_id"],
+            "interview_type": session["interview_type"].value if hasattr(session["interview_type"], 'value') else str(session["interview_type"]),
+            "job_role": session["job_role"],
+            "difficulty": session["difficulty"].value if hasattr(session["difficulty"], 'value') else str(session["difficulty"]),
+            "status": session["status"].value if hasattr(session["status"], 'value') else str(session["status"]),
+            "total_questions": num_q,
+            "questions_answered": session["current_index"],
+            "total_score": session["total_score"],
+            "max_score": num_q * 10,
+            "questions": session["mcq_questions"],
+            "answers": session["mcq_answers"],
+            "created_at": str(session.get("started_at", "")),
+            "completed_at": None,
+        }
 
 
 # ── Module-level service singleton ────────────────────────────────────────────

@@ -129,6 +129,9 @@ class InterviewDocument(BaseModel):
     scores: Optional[Dict[str, Any]] = Field(default=None, description="Aggregated scores")
     duration_seconds: int = Field(default=0, ge=0, description="Total interview duration in seconds")
     status: InterviewStatus = Field(default=InterviewStatus.ACTIVE)
+    resume_text: Optional[str] = Field(default=None, description="Extracted resume text for context")
+    mcq_questions: List[Dict[str, Any]] = Field(default_factory=list, description="MCQ questions with options")
+    mcq_answers: List[Dict[str, Any]] = Field(default_factory=list, description="MCQ answer records")
     created_at: datetime = Field(default_factory=datetime.utcnow)
     completed_at: Optional[datetime] = Field(default=None)
 
@@ -288,4 +291,54 @@ class AdminStatsDocument(BaseModel):
         """Construct an ``AdminStatsDocument`` from a raw MongoDB document."""
         if doc and "_id" in doc:
             doc["stats_id"] = doc.pop("_id")
+        return cls(**doc)
+
+
+# ─────────────────────────────────────────────────────────
+# MCQ Question Document  →  collection: "mcq_questions"
+# ─────────────────────────────────────────────────────────
+
+class MCQAnswerRecord(BaseModel):
+    """A single MCQ answer within an interview session."""
+    question_id: str = Field(..., description="ID of the MCQ question")
+    user_answer: str = Field(..., description="User's answer: A, B, C, or D")
+    correct_answer: str = Field(..., description="Correct answer: A, B, C, or D")
+    is_correct: bool = Field(default=False)
+    score: int = Field(default=0, description="10 if correct, 0 if incorrect")
+    submitted_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class MCQQuestionDocument(BaseModel):
+    """
+    MongoDB document for an MCQ question.
+
+    Stored in the ``mcq_questions`` collection.
+    Used for seeding a static MCQ bank that admins can manage.
+    """
+    question_id: str = Field(default_factory=lambda: str(uuid.uuid4()), description="Unique question ID")
+    question_text: str = Field(..., description="The MCQ question text")
+    option_a: str = Field(..., description="Option A")
+    option_b: str = Field(..., description="Option B")
+    option_c: str = Field(..., description="Option C")
+    option_d: str = Field(..., description="Option D")
+    correct_answer: str = Field(..., description="Correct answer: A, B, C, or D")
+    explanation: str = Field(default="", description="Why this answer is correct")
+    job_role: str = Field(default="General", description="Target job role")
+    difficulty: DifficultyLevel = Field(default=DifficultyLevel.INTERMEDIATE)
+    interview_type: InterviewType = Field(default=InterviewType.TECHNICAL)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+    def to_mongo(self) -> Dict[str, Any]:
+        """Convert to a MongoDB-friendly dict."""
+        data = self.model_dump()
+        data["_id"] = data.pop("question_id")
+        data["difficulty"] = data["difficulty"].value if isinstance(data["difficulty"], DifficultyLevel) else data["difficulty"]
+        data["interview_type"] = data["interview_type"].value if isinstance(data["interview_type"], InterviewType) else data["interview_type"]
+        return data
+
+    @classmethod
+    def from_mongo(cls, doc: Dict[str, Any]) -> "MCQQuestionDocument":
+        """Construct an ``MCQQuestionDocument`` from a raw MongoDB document."""
+        if doc and "_id" in doc:
+            doc["question_id"] = doc.pop("_id")
         return cls(**doc)

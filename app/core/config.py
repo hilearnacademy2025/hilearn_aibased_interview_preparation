@@ -62,6 +62,14 @@ class Settings(BaseSettings):
     admin_email: str = "admin@hilearn.ai"
     admin_password: str = "Admin@HiLearn123"
 
+    # ── Email / SMTP ──────────────────────────────────────────────────────
+    smtp_host: str = "smtp.gmail.com"
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_from_email: str = "noreply@hilearn.in"
+    smtp_use_tls: bool = True
+
     # ── Tier Limits ───────────────────────────────────────────────────────
     free_tier_interviews_per_month: int = 3
     pro_tier_price_inr: int = 299

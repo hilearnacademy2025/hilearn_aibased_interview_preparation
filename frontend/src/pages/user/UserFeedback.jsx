@@ -71,9 +71,11 @@
 // }
 
 
+import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { Link } from 'react-router-dom'
-import { Award, BarChart3, CheckCircle, ArrowRight, Mic, Clock, Zap } from 'lucide-react'
+import { Award, BarChart3, CheckCircle, ArrowRight, Mic, Clock, Zap, Mail, Loader } from 'lucide-react'
+import { sendResultsEmail } from '../../utils/api'
 
 export default function UserFeedback() {
   // UserInterview.jsx ne yeh localStorage me save kiya tha interview complete hone par
@@ -91,6 +93,30 @@ export default function UserFeedback() {
   const voice = feedback.voice_analysis || null
 
   const hasRealData = score > 0
+
+  // Email state
+  const [sendingEmail, setSendingEmail] = useState(false)
+  const [emailSent, setEmailSent] = useState(false)
+  const [emailError, setEmailError] = useState('')
+
+  const sessionId = completeFeedback?.session_id || localStorage.getItem('hilearn_session_id') || ''
+
+  const handleSendEmail = async () => {
+    if (!sessionId) {
+      setEmailError('No session found to send results for.')
+      return
+    }
+    setSendingEmail(true)
+    setEmailError('')
+    try {
+      await sendResultsEmail(sessionId)
+      setEmailSent(true)
+    } catch (err) {
+      setEmailError(err.message || 'Failed to send email.')
+    } finally {
+      setSendingEmail(false)
+    }
+  }
 
   return (
     <div className="max-w-3xl space-y-6">
@@ -217,7 +243,7 @@ export default function UserFeedback() {
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.35 }}
-        className="flex gap-4"
+        className="flex flex-wrap gap-3"
       >
         <Link
           to="/user/interview-setup"
@@ -225,6 +251,21 @@ export default function UserFeedback() {
         >
           Practice Again <ArrowRight size={18} />
         </Link>
+        {hasRealData && sessionId && (
+          <button
+            onClick={handleSendEmail}
+            disabled={sendingEmail || emailSent}
+            className="flex items-center justify-center gap-2 px-6 py-4 bg-[#0f1f3d] text-white rounded-full font-bold hover:bg-[#1a3a6b] transition disabled:opacity-60"
+          >
+            {sendingEmail ? (
+              <><Loader size={14} className="animate-spin" /> Sending...</>
+            ) : emailSent ? (
+              <><CheckCircle size={14} /> Sent ✉️</>
+            ) : (
+              <><Mail size={14} /> Email Results</>
+            )}
+          </button>
+        )}
         <Link
           to="/user"
           className="px-6 py-4 border-2 border-[#e0dbd3] rounded-full font-semibold text-[#5c5a57] hover:border-[#c8601a]/50 transition"
@@ -232,6 +273,17 @@ export default function UserFeedback() {
           Dashboard
         </Link>
       </motion.div>
+
+      {emailError && (
+        <p className="text-sm text-rose-600 bg-rose-50 border border-rose-200 rounded-xl px-4 py-2">
+          {emailError}
+        </p>
+      )}
+      {emailSent && (
+        <p className="text-sm text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-2">
+          ✅ Results sent to your registered email!
+        </p>
+      )}
     </div>
   )
 }

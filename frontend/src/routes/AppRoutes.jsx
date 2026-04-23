@@ -161,6 +161,8 @@ import UserInterview from '../pages/user/UserInterview'
 import UserAnalytics from '../pages/user/UserAnalytics'
 import UserFeedback from '../pages/user/UserFeedback'
 import UserSettings from '../pages/user/UserSettings'
+import UserMCQInterview from '../pages/user/UserMCQInterview'
+import MCQResults from '../pages/user/MCQResults'
 
 // Smooth fade - no jhatka
 const pageVariants = {
@@ -275,6 +277,8 @@ export default function AppRoutes() {
             <Route path="analytics" element={<UserAnalytics />} />
             <Route path="feedback" element={<UserFeedback />} />
             <Route path="settings" element={<UserSettings />} />
+            <Route path="mcq-interview" element={<UserMCQInterview />} />
+            <Route path="mcq-results" element={<MCQResults />} />
           </Route>
         </Routes>
       </ToastProvider>

@@ -190,4 +190,36 @@ export const getAdminAnalytics = async () => {
   return data
 }
 
+// ── MCQ APIs ───────────────────────────────────────────────────────────────────
+export const startMCQ = async (payload) => {
+  const { data } = await api.post('/interview/start-mcq', payload)
+  return data
+}
+
+export const submitMCQ = async (payload) => {
+  const { data } = await api.post('/interview/submit-mcq', payload)
+  return data
+}
+
+export const getMCQSession = async (sessionId) => {
+  const { data } = await api.get(`/interview/mcq/${sessionId}`)
+  return data
+}
+
+// ── Email Results API ──────────────────────────────────────────────────────────
+export const sendResultsEmail = async (sessionId) => {
+  const { data } = await api.post('/interview/send-results-email', { session_id: sessionId })
+  return data
+}
+
+// ── Resume Upload API ──────────────────────────────────────────────────────────
+export const uploadResume = async (file) => {
+  const formData = new FormData()
+  formData.append('resume_file', file, file.name)
+  const { data } = await api.post('/interview/upload-resume', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
+  return data
+}
+
 export default api

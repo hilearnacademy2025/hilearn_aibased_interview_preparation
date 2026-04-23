@@ -153,6 +153,7 @@ const interviewTypes = [
   { id: 'hr', name: 'HR Round', icon: '🤝', desc: 'HR, Culture fit' },
   { id: 'behavioral', name: 'Behavioral', icon: '🧠', desc: 'STAR method, examples' },
   { id: 'domain_specific', name: 'Domain', icon: '🎯', desc: 'Role-specific questions' },
+  { id: 'mcq', name: 'MCQ Quiz', icon: '📝', desc: 'Multiple Choice Questions' },
 ]
 const difficulties = [
   { id: 'beginner', name: 'Beginner' },
@@ -202,7 +203,7 @@ export default function UserInterviewSetup() {
     // if (!formData.jobRole) { setError('Please select a job role.'); return }
     const hasResume = !!localStorage.getItem('hilearn_resume_text')
     if (!formData.jobRole && !hasResume) {
-      setError('Please select a job role or upload a resume.');
+      setError('Please select a job role or upload a resume.')
       return
     }
     if (!user) { setError('You must be logged in to start an interview.'); return }
@@ -213,24 +214,42 @@ export default function UserInterviewSetup() {
         ? formData.techStack.split(',').map(s => s.trim()).filter(Boolean)
         : undefined
 
-      const payload = {
-        user_id: user.user_id,
-        job_role: formData.jobRole,
-        interview_type: formData.interviewType,
-        difficulty: formData.difficulty,
-        tech_stack: techStackArray,
-        resume_text: localStorage.getItem('hilearn_resume_text') || undefined,
-      }
+      const isMCQ = formData.interviewType === 'mcq'
 
-      const { data } = await api.post('/interview/start-interview', payload)
-      localStorage.setItem('hilearn_interview_session', JSON.stringify(data))
-      localStorage.setItem('hilearn_current_question', JSON.stringify(data.first_question))
-      navigate('/user/interview')
+      if (isMCQ) {
+        // MCQ Flow — use dedicated MCQ endpoint
+        const { startMCQ } = await import('../../utils/api')
+        const mcqPayload = {
+          user_id: user.user_id,
+          job_role: formData.jobRole || undefined,
+          interview_type: 'technical',  // MCQ uses technical type for now
+          difficulty: formData.difficulty,
+          num_questions: 10,
+          tech_stack: techStackArray,
+          resume_text: localStorage.getItem('hilearn_resume_text') || undefined,
+        }
+        const data = await startMCQ(mcqPayload)
+        localStorage.setItem('hilearn_mcq_session', JSON.stringify(data))
+        navigate('/user/mcq-interview')
+      } else {
+        // Regular interview flow
+        const payload = {
+          user_id: user.user_id,
+          job_role: formData.jobRole,
+          interview_type: formData.interviewType,
+          difficulty: formData.difficulty,
+          tech_stack: techStackArray,
+          resume_text: localStorage.getItem('hilearn_resume_text') || undefined,
+        }
+        const { data } = await api.post('/interview/start-interview', payload)
+        localStorage.setItem('hilearn_interview_session', JSON.stringify(data))
+        localStorage.setItem('hilearn_current_question', JSON.stringify(data.first_question))
+        navigate('/user/interview')
+      }
     } catch (err) {
       setError(err.response?.data?.detail || err.message || 'Failed to start interview. Try again.')
     } finally {
       setLoading(false)
-    }
   }
 
   return (
