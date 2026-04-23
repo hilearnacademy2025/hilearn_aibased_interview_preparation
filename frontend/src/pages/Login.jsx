@@ -110,11 +110,11 @@ function Login() {
                 {isLoading ? <span className="flex items-center gap-3"><span className="h-5 w-5 animate-spin rounded-full border-2 border-white/50 border-t-white" />Signing in…</span> : 'Sign in'}
               </button>
             </form>
-            <div className="mt-6 rounded-[24px] border border-[#e0dbd3] bg-[#fffaf4] px-5 py-4 text-xs text-[#5c5a57] space-y-1">
+            {/* <div className="mt-6 rounded-[24px] border border-[#e0dbd3] bg-[#fffaf4] px-5 py-4 text-xs text-[#5c5a57] space-y-1">
               <p className="font-semibold text-[#0f1f3d]">Demo credentials</p>
               <p>User: <code className="bg-[#f4f2ee] px-1 rounded">demo@hilearn.ai</code> / <code className="bg-[#f4f2ee] px-1 rounded">Demo@123!</code></p>
               <p>Admin: use credentials from your <code className="bg-[#f4f2ee] px-1 rounded">.env</code> file</p>
-            </div>
+            </div> */}
           </motion.div>
         </div>
       </section>

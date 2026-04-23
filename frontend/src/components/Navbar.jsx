@@ -6,6 +6,7 @@ const PAGE_TITLES = {
   "/": "Home",
   "/features": "Features",
   "/pricing": "Pricing",
+  "/interview": "Interview",
   "/about": "About",
   "/login": "Login",
   "/signup": "Get Started",
