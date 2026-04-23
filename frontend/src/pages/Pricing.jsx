@@ -1,3 +1,4 @@
+
 // import { AnimatePresence, motion } from 'framer-motion'
 // import { useEffect, useState } from 'react'
 // import Button from '../components/common/Button'
@@ -88,10 +89,10 @@
 //                   ['Feedback detail', 'Core', 'Detailed', 'Advanced'],
 //                   ['Dashboard access', 'Limited', 'Full', 'Full'],
 //                   ['Priority help', '—', '—', 'Included'],
-//                 ].map((row) => (
+//                 ].map((row, rowIdx) => (
 //                   <tr key={row[0]} className="border-b border-[#f0ebe3]">
-//                     {row.map((cell) => (
-//                       <td key={cell} className="py-4">{cell}</td>
+//                     {row.map((cell, colIdx) => (
+//                       <td key={`${row[0]}-${colIdx}`} className="py-4">{cell}</td>
 //                     ))}
 //                   </tr>
 //                 ))}
@@ -160,6 +161,8 @@
 
 
 
+
+
 import { AnimatePresence, motion } from 'framer-motion'
 import { useEffect, useState } from 'react'
 import Button from '../components/common/Button'
@@ -167,9 +170,9 @@ import PageTransition from '../components/common/PageTransition'
 import { fadeUp, staggerContainer } from '../components/common/motion'
 
 const plans = [
-  { name: 'Starter', price: 'Free', description: 'Practice the core flow with a limited round count.', featured: false, perks: ['1 live interview flow', 'Core feedback summary', 'Basic history'] },
-  { name: 'Pro', price: '₹299/mo', description: 'Unlimited practice with the premium motion-rich experience.', featured: true, perks: ['Unlimited interview flows', 'Detailed feedback panels', 'Dashboard insights'] },
-  { name: 'Premium', price: '₹799/mo', description: 'For candidates who want more structure and mentorship touchpoints.', featured: false, perks: ['Everything in Pro', 'Priority support', 'Extended practice packs'] },
+  { name: 'Starter', price: 'Free', description: 'Practice the core flow with a limited round count.', featured: false, perks: ['1 live interview flow', 'Core feedback summary', 'Basic history'], planKey: 'starter' },
+  { name: 'Pro', price: '₹299/mo', description: 'Unlimited practice with the premium motion-rich experience.', featured: true, perks: ['Unlimited interview flows', 'Detailed feedback panels', 'Dashboard insights'], planKey: 'pro' },
+  { name: 'Premium', price: '₹799/mo', description: 'For candidates who want more structure and mentorship touchpoints.', featured: false, perks: ['Everything in Pro', 'Priority support', 'Extended practice packs'], planKey: 'premium' },
 ]
 
 const faqs = [
@@ -218,7 +221,7 @@ function PricingPage() {
                   </div>
                 ))}
               </div>
-              <Button to="/signup" className="mt-8 w-full justify-center">
+              <Button to={plan.planKey === 'starter' ? '/signup' : `/checkout?plan=${plan.planKey}`} className="mt-8 w-full justify-center">
                 Choose {plan.name}
               </Button>
             </motion.div>

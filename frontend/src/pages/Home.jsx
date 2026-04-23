@@ -6,6 +6,7 @@ import AnimatedCounter from '../components/common/AnimatedCounter'
 import PageTransition from '../components/common/PageTransition'
 import SectionDivider from '../components/common/SectionDivider'
 import { fadeUp, staggerContainer } from '../components/common/motion'
+import LMSCoursesSection from '../components/home/LMSCoursesSection'
 
 const stats = [
   { label: 'Mock interviews completed', value: 4800, suffix: '+' },
@@ -218,7 +219,10 @@ function Home() {
         </motion.div>
       </section>
 
-      <div className="mt-20">
+
+       <LMSCoursesSection />
+
+      <div>
         <SectionDivider />
       </div>
 

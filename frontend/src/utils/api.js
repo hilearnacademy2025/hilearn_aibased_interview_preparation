@@ -1,3 +1,4 @@
+
 // import axios from 'axios'
 
 // const api = axios.create({
@@ -7,9 +8,46 @@
 //   },
 // })
 
+// // ── Request Interceptor: har request pe Authorization header auto-attach ──────
+// api.interceptors.request.use(
+//   (config) => {
+//     const token = localStorage.getItem('hilearn_token')
+//     if (token) {
+//       config.headers['Authorization'] = `Bearer ${token}`
+//     }
+//     return config
+//   },
+//   (error) => Promise.reject(error),
+// )
+
+// // ── Response Interceptor: 401 pe auto token refresh try ──────────────────────
 // api.interceptors.response.use(
 //   (response) => response,
-//   (error) => {
+//   async (error) => {
+//     const originalRequest = error.config
+
+//     if (
+//       error.response?.status === 401 &&
+//       !originalRequest._retry &&
+//       !originalRequest.url?.includes('/auth/refresh-token')
+//     ) {
+//       originalRequest._retry = true
+//       try {
+//         const token = localStorage.getItem('hilearn_token')
+//         if (token) {
+//           const { data } = await api.post('/auth/refresh-token', { token })
+//           localStorage.setItem('hilearn_token', data.token)
+//           api.defaults.headers.common['Authorization'] = `Bearer ${data.token}`
+//           originalRequest.headers['Authorization'] = `Bearer ${data.token}`
+//           return api(originalRequest)
+//         }
+//       } catch {
+//         localStorage.removeItem('hilearn_token')
+//         delete api.defaults.headers.common['Authorization']
+//         window.location.href = '/login'
+//       }
+//     }
+
 //     const message =
 //       error.response?.data?.detail ||
 //       error.response?.data?.message ||
@@ -20,6 +58,27 @@
 //   },
 // )
 
+// // ── Auth APIs ──────────────────────────────────────────────────────────────────
+// export const loginApi = async (email, password) => {
+//   const { data } = await api.post('/auth/login', { email, password })
+//   return data
+// }
+
+// export const signupApi = async (name, email, password) => {
+//   const { data } = await api.post('/auth/signup', { name, email, password })
+//   return data
+// }
+
+// export const logoutApi = async () => {
+//   await api.post('/auth/logout')
+// }
+
+// export const getMeApi = async () => {
+//   const { data } = await api.get('/auth/me')
+//   return data
+// }
+
+// // ── Interview APIs ─────────────────────────────────────────────────────────────
 // export const startInterview = async (payload) => {
 //   const { data } = await api.post('/interview/start-interview', payload)
 //   return data
@@ -35,12 +94,63 @@
 //   return data
 // }
 
+// export const getUserSessions = async (userId) => {
+//   const { data } = await api.get(`/interview/sessions/user/${userId}`)
+//   return data
+// }
+
+// // ── Audio Transcription API ────────────────────────────────────────────────────
+// export const transcribeAudio = async (audioBlob, filename = 'recording.webm') => {
+//   const formData = new FormData()
+//   formData.append('audio_file', audioBlob, filename)
+//   const { data } = await api.post('/interview/transcribe-audio', formData, {
+//     headers: { 'Content-Type': 'multipart/form-data' },
+//   })
+//   return data
+// }
+
+// // ── Health Check ───────────────────────────────────────────────────────────────
 // export const healthCheck = async () => {
 //   const { data } = await api.get('/health')
 //   return data
 // }
 
+// // ── Admin APIs ─────────────────────────────────────────────────────────────────
+// export const getAdminDashboard = async () => {
+//   const { data } = await api.get('/admin/dashboard')
+//   return data
+// }
+
+// export const getAdminUsers = async (params = {}) => {
+//   const { data } = await api.get('/admin/users', { params })
+//   return data
+// }
+
+// export const updateAdminUser = async (userId, payload) => {
+//   const { data } = await api.put(`/admin/users/${userId}`, payload)
+//   return data
+// }
+
+// export const deleteAdminUser = async (userId) => {
+//   const { data } = await api.delete(`/admin/users/${userId}`)
+//   return data
+// }
+
+// export const getAdminInterviews = async (params = {}) => {
+//   const { data } = await api.get('/admin/interviews', { params })
+//   return data
+// }
+
+// export const getAdminAnalytics = async () => {
+//   const { data } = await api.get('/admin/analytics')
+//   return data
+// }
+
 // export default api
+
+
+
+
 
 
 import axios from 'axios'
@@ -191,3 +301,18 @@ export const getAdminAnalytics = async () => {
 }
 
 export default api
+// ── Payment APIs ───────────────────────────────────────────────────────────────
+export const getPlans = async () => {
+  const { data } = await api.get("/payment/plans")
+  return data
+}
+
+export const createPaymentOrder = async (plan) => {
+  const { data } = await api.post("/payment/create-order", { plan })
+  return data
+}
+
+export const verifyPayment = async (payload) => {
+  const { data } = await api.post("/payment/verify", payload)
+  return data
+}
