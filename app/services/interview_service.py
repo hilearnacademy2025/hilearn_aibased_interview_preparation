@@ -2037,14 +2037,24 @@ class InterviewService:
             )
 
         current_q = mcq_questions[current_idx]
-        user_answer = payload.answer.upper().strip()
-        correct_answer = current_q["correct_answer"].upper()
-        is_correct = user_answer == correct_answer
+        import re
+
+        user_answer_raw = payload.answer.upper().strip()
+        correct_answer_raw = str(current_q.get("correct_answer", "")).upper().strip()
+
+        # Extract just the option letter (A, B, C, or D)
+        user_match = re.search(r'\b[A-D]\b|[A-D]', user_answer_raw)
+        user_answer = user_match.group(0) if user_match else user_answer_raw
+
+        correct_match = re.search(r'\b[A-D]\b|[A-D]', correct_answer_raw)
+        correct_answer = correct_match.group(0) if correct_match else correct_answer_raw
+
+        is_correct = (user_answer == correct_answer)
         score = 10 if is_correct else 0
 
         logger.info(
-            "MCQ answer | session={} | q#{} | user={} | correct={} | is_correct={}",
-            payload.session_id, current_idx + 1, user_answer, correct_answer, is_correct,
+            "MCQ answer | session={} | q#{} | user={} (raw: {}) | correct={} (raw: {}) | is_correct={}",
+            payload.session_id, current_idx + 1, user_answer, user_answer_raw, correct_answer, correct_answer_raw, is_correct,
         )
 
         # Record answer
@@ -2115,12 +2125,16 @@ class InterviewService:
             logger.info("MCQ session completed: {} | score={}/{}", 
                         payload.session_id, session["total_score"], num_questions * 10)
 
+            # Calculate percentage score out of 100
+            max_possible_score = num_questions * 10
+            percentage_score = (session["total_score"] / max(max_possible_score, 1)) * 100
+
             await _update_session_status_in_db(
                 payload.session_id, InterviewStatus.COMPLETED.value
             )
             await _update_user_stats_in_db(
                 session["user_id"],
-                round(session["total_score"] / max(num_questions, 1), 1),
+                round(percentage_score, 1),
             )
 
         message = (
