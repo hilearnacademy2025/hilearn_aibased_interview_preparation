@@ -3,7 +3,7 @@ import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import {
   LayoutDashboard, Mic, BarChart3, Settings, LogOut,
-  Menu, X, ChevronRight, Bell, Award, Zap, FileQuestion
+  Menu, X, ChevronRight, Bell, Award, Zap, FileQuestion, Trophy
 } from 'lucide-react'
 
 const userNavItems = [
@@ -13,6 +13,7 @@ const userNavItems = [
       { icon: LayoutDashboard, label: 'Dashboard', href: '/user' },
       { icon: Mic, label: 'Mock Interviews', href: '/user/interview-setup' },
       // { icon: FileQuestion, label: 'MCQ Quiz', href: '/user/mcq-interview' },
+      { icon: Trophy, label: 'Leaderboard', href: '/user/leaderboard' },
       { icon: BarChart3, label: 'My Progress', href: '/user/analytics' },
       { icon: Award, label: 'My Feedback', href: '/user/feedback' },
     ],

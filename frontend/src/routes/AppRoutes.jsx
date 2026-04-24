@@ -317,6 +317,7 @@ import AdminUsers from '../pages/admin/AdminUsers'
 import AdminInterviews from '../pages/admin/AdminInterviews'
 import AdminAnalytics from '../pages/admin/AdminAnalytics'
 import AdminSettings from '../pages/admin/AdminSettings'
+import AdminLeaderboard from '../pages/admin/AdminLeaderboard'
 
 import UserDashboard from '../pages/user/UserDashboard'
 import UserInterviewSetup from '../pages/user/UserInterviewSetup'
@@ -326,6 +327,7 @@ import UserFeedback from '../pages/user/UserFeedback'
 import UserSettings from '../pages/user/UserSettings'
 import UserMCQInterview from '../pages/user/UserMCQInterview'
 import MCQResults from '../pages/user/MCQResults'
+import Leaderboard from '../pages/user/Leaderboard'
 
 // Smooth fade - no jhatka
 const pageVariants = {
@@ -423,6 +425,7 @@ export default function AppRoutes() {
             <Route path="users" element={<AdminUsers />} />
             <Route path="interviews" element={<AdminInterviews />} />
             <Route path="analytics" element={<AdminAnalytics />} />
+            <Route path="leaderboard" element={<AdminLeaderboard />} />
             <Route path="settings" element={<AdminSettings />} />
           </Route>
         </Routes>
@@ -443,6 +446,7 @@ export default function AppRoutes() {
             <Route path="settings" element={<UserSettings />} />
             <Route path="mcq-interview" element={<UserMCQInterview />} />
             <Route path="mcq-results" element={<MCQResults />} />
+            <Route path="leaderboard" element={<Leaderboard />} />
           </Route>
         </Routes>
       </ToastProvider>

@@ -1073,12 +1073,43 @@ async def list_interviews(
         total = await db.interviews.count_documents(query)
 
         interviews = []
-        cursor = db.interviews.find(query).sort("created_at", -1).skip(skip).limit(limit)
+        pipeline = [
+            {"$match": query},
+            {"$sort": {"created_at": -1}},
+            {"$skip": skip},
+            {"$limit": limit},
+            {
+                "$lookup": {
+                    "from": "users",
+                    "let": {"uid": "$user_id"},
+                    "pipeline": [
+                        {
+                            "$match": {
+                                "$expr": {
+                                    "$or": [
+                                        {"$eq": ["$_id", "$$uid"]},
+                                        {"$eq": [{"$toString": "$_id"}, "$$uid"]},
+                                    ]
+                                }
+                            }
+                        }
+                    ],
+                    "as": "user_info",
+                }
+            },
+            {
+                "$unwind": {
+                    "path": "$user_info",
+                    "preserveNullAndEmptyArrays": True,
+                }
+            }
+        ]
+        cursor = db.interviews.aggregate(pipeline)
 
         async for doc in cursor:
-            # Look up user name
-            u_doc = await db.users.find_one({"_id": doc.get("user_id")}, {"name": 1})
-            user_name = u_doc.get("name", "Unknown") if u_doc else "Unknown"
+            # Get user name from joined data
+            user_info = doc.get("user_info", {})
+            user_name = user_info.get("name", "Unknown") if isinstance(user_info, dict) else "Unknown"
 
             # Calculate score
             answers = doc.get("answers", [])

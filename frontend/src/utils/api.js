@@ -348,4 +348,23 @@ export const uploadResume = async (file) => {
   return data
 }
 
+// ── Leaderboard APIs ───────────────────────────────────────────────────────────
+export const getLeaderboard = async (role = null, timeframe = null) => {
+  const params = {}
+  if (role) params.role = role
+  if (timeframe) params.timeframe = timeframe
+  const { data } = await api.get('/leaderboard', { params })
+  return data
+}
+
+export const getMyRank = async () => {
+  const { data } = await api.get('/leaderboard/my-rank')
+  return data
+}
+
+export const getUserProfile = async (userId) => {
+  const { data } = await api.get(`/admin/users/${userId}`)
+  return data
+}
+
 export default api

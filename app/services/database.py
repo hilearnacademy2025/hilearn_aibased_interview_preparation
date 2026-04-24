@@ -826,7 +826,7 @@ Gracefully falls back to in-memory when MongoDB is unavailable.
 
 Day 5: Complete database layer for persistence.
 """
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
 from loguru import logger
@@ -1533,6 +1533,480 @@ class DatabaseService:
             return False
         except Exception as exc:
             logger.error("[DB] add_mcq_answer failed | session_id={} | error={}", session_id, exc)
+            return False
+
+
+    # ───────────────────────────────────────────────────────────────────────
+    # Leaderboard Methods
+    # ───────────────────────────────────────────────────────────────────────
+
+    async def get_leaderboard(
+        self, limit: int = 5, role: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Return the top N users ranked by average score (all-time).
+
+        Aggregates from the `interviews` collection (completed interviews),
+        computes per-user average from answer scores, and $lookup users
+        collection to get names.
+
+        Args:
+            limit: Number of top users to return (default 5).
+            role: Optional job role filter (case-insensitive substring match).
+
+        Returns:
+            List of dicts with rank, user_id, name, score, interviews_completed, role.
+        """
+        db = self._get_db()
+        if db is None:
+            return []
+
+        try:
+            # Match only completed interviews
+            match_stage: Dict[str, Any] = {"status": "completed"}
+            if role:
+                match_stage["job_role"] = {"$regex": role, "$options": "i"}
+
+            pipeline = [
+                {"$match": match_stage},
+                # Compute per-interview score from answers
+                {
+                    "$addFields": {
+                        "_answer_scores": {
+                            "$map": {
+                                "input": {"$ifNull": ["$answers", []]},
+                                "as": "a",
+                                "in": {
+                                    "$ifNull": [
+                                        "$$a.content_score",
+                                        {"$ifNull": ["$$a.overall_score", 0]}
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "_interview_score": {
+                            "$cond": {
+                                "if": {"$gt": [{"$size": "$_answer_scores"}, 0]},
+                                "then": {"$avg": "$_answer_scores"},
+                                "else": 0
+                            }
+                        }
+                    }
+                },
+                # Group by user
+                {
+                    "$group": {
+                        "_id": "$user_id",
+                        "avg_score": {"$avg": "$_interview_score"},
+                        "interviews_completed": {"$sum": 1},
+                        "job_role": {"$last": "$job_role"},
+                    }
+                },
+                {"$match": {"avg_score": {"$gt": 0}}},
+                {"$sort": {"avg_score": -1, "interviews_completed": -1}},
+                {"$limit": limit},
+                # Lookup user name from users collection (handles ObjectId/string mismatch)
+                {
+                    "$lookup": {
+                        "from": "users",
+                        "let": {"uid": "$_id"},
+                        "pipeline": [
+                            {
+                                "$match": {
+                                    "$expr": {
+                                        "$or": [
+                                            {"$eq": ["$_id", "$$uid"]},
+                                            {"$eq": [{"$toString": "$_id"}, "$$uid"]},
+                                        ]
+                                    }
+                                }
+                            }
+                        ],
+                        "as": "user_info",
+                    }
+                },
+                {
+                    "$unwind": {
+                        "path": "$user_info",
+                        "preserveNullAndEmptyArrays": True,
+                    }
+                },
+                {
+                    "$project": {
+                        "_id": 0,
+                        "user_id": "$_id",
+                        "name": {"$ifNull": ["$user_info.name", "Unknown User"]},
+                        "score": {"$round": ["$avg_score", 1]},
+                        "interviews_completed": 1,
+                        "role": {"$ifNull": ["$job_role", "Not specified"]},
+                        "avatar": "",
+                    }
+                },
+            ]
+
+            results = []
+            cursor = db.interviews.aggregate(pipeline)
+            rank = 1
+            async for doc in cursor:
+                doc["rank"] = rank
+                results.append(doc)
+                rank += 1
+
+            logger.debug(
+                "[DB] get_leaderboard | role={} | limit={} | results={}",
+                role, limit, len(results),
+            )
+            return results
+
+        except Exception as exc:
+            logger.error("[DB] get_leaderboard failed | error={}", exc)
+            return []
+
+    async def get_weekly_leaderboard(
+        self, limit: int = 5, role: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Return the top N users ranked by average score from the last 7 days.
+
+        Aggregates from the interviews collection, computes per-interview
+        score from answers, filtering by created_at.
+
+        Args:
+            limit: Number of top users to return.
+            role: Optional job role filter.
+
+        Returns:
+            List of dicts with rank, user_id, name, score, interviews_completed, role.
+        """
+        db = self._get_db()
+        if db is None:
+            return []
+
+        try:
+            now = datetime.utcnow()
+            week_start = now - timedelta(days=7)
+
+            match_stage: Dict[str, Any] = {
+                "created_at": {"$gte": week_start},
+                "status": "completed",
+            }
+            if role:
+                match_stage["job_role"] = {"$regex": role, "$options": "i"}
+
+            pipeline = [
+                {"$match": match_stage},
+                # Compute per-interview score from answers
+                {
+                    "$addFields": {
+                        "_answer_scores": {
+                            "$map": {
+                                "input": {"$ifNull": ["$answers", []]},
+                                "as": "a",
+                                "in": {
+                                    "$ifNull": [
+                                        "$$a.content_score",
+                                        {"$ifNull": ["$$a.overall_score", 0]}
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "_interview_score": {
+                            "$cond": {
+                                "if": {"$gt": [{"$size": "$_answer_scores"}, 0]},
+                                "then": {"$avg": "$_answer_scores"},
+                                "else": 0
+                            }
+                        }
+                    }
+                },
+                # Group by user
+                {
+                    "$group": {
+                        "_id": "$user_id",
+                        "avg_score": {"$avg": "$_interview_score"},
+                        "interviews_completed": {"$sum": 1},
+                        "job_role": {"$last": "$job_role"},
+                    }
+                },
+                {"$sort": {"avg_score": -1, "interviews_completed": -1}},
+                {"$limit": limit},
+                # Lookup user name (handles ObjectId/string mismatch)
+                {
+                    "$lookup": {
+                        "from": "users",
+                        "let": {"uid": "$_id"},
+                        "pipeline": [
+                            {
+                                "$match": {
+                                    "$expr": {
+                                        "$or": [
+                                            {"$eq": ["$_id", "$$uid"]},
+                                            {"$eq": [{"$toString": "$_id"}, "$$uid"]},
+                                        ]
+                                    }
+                                }
+                            }
+                        ],
+                        "as": "user_info",
+                    }
+                },
+                {
+                    "$unwind": {
+                        "path": "$user_info",
+                        "preserveNullAndEmptyArrays": True,
+                    }
+                },
+                {
+                    "$project": {
+                        "_id": 0,
+                        "user_id": "$_id",
+                        "name": {"$ifNull": ["$user_info.name", "Unknown User"]},
+                        "score": {"$round": ["$avg_score", 1]},
+                        "interviews_completed": 1,
+                        "role": {"$ifNull": ["$job_role", "Not specified"]},
+                        "avatar": "",
+                    }
+                },
+            ]
+
+            results = []
+            cursor = db.interviews.aggregate(pipeline)
+            rank = 1
+            async for doc in cursor:
+                doc["rank"] = rank
+                results.append(doc)
+                rank += 1
+
+            logger.debug(
+                "[DB] get_weekly_leaderboard | role={} | limit={} | results={}",
+                role, limit, len(results),
+            )
+            return results
+
+        except Exception as exc:
+            logger.error("[DB] get_weekly_leaderboard failed | error={}", exc)
+            return []
+
+    async def get_user_rank(self, user_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Get a specific user's global rank, score, and percentile.
+
+        Aggregates from the interviews collection to compute real scores,
+        then determines rank by counting users with higher scores.
+
+        Args:
+            user_id: The user's unique identifier.
+
+        Returns:
+            Dict with rank, score, interviews_completed, total_users, percentile.
+            None if user has no completed interviews.
+        """
+        db = self._get_db()
+        if db is None:
+            return None
+
+        try:
+            # First, get the user's name from users collection
+            # Try string match first, then ObjectId match (handles type mismatch)
+            user_doc = await db.users.find_one({"_id": user_id})
+            if not user_doc:
+                from bson import ObjectId as BsonObjectId
+                try:
+                    user_doc = await db.users.find_one({"_id": BsonObjectId(user_id)})
+                except Exception:
+                    pass
+            user_name = user_doc.get("name", "Unknown User") if user_doc else "Unknown User"
+
+            # Aggregate this user's stats from interviews
+            user_pipeline = [
+                {"$match": {"user_id": user_id, "status": "completed"}},
+                {
+                    "$addFields": {
+                        "_answer_scores": {
+                            "$map": {
+                                "input": {"$ifNull": ["$answers", []]},
+                                "as": "a",
+                                "in": {
+                                    "$ifNull": [
+                                        "$$a.content_score",
+                                        {"$ifNull": ["$$a.overall_score", 0]}
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "_interview_score": {
+                            "$cond": {
+                                "if": {"$gt": [{"$size": "$_answer_scores"}, 0]},
+                                "then": {"$avg": "$_answer_scores"},
+                                "else": 0
+                            }
+                        }
+                    }
+                },
+                {
+                    "$group": {
+                        "_id": "$user_id",
+                        "avg_score": {"$avg": "$_interview_score"},
+                        "interviews_completed": {"$sum": 1},
+                        "job_role": {"$last": "$job_role"},
+                    }
+                },
+            ]
+
+            user_stats = None
+            async for doc in db.interviews.aggregate(user_pipeline):
+                user_stats = doc
+
+            if not user_stats or user_stats.get("interviews_completed", 0) == 0:
+                return None
+
+            user_score = user_stats["avg_score"]
+            user_interviews = user_stats["interviews_completed"]
+            user_role = user_stats.get("job_role", "Not specified")
+
+            # Get all users' scores to determine rank
+            all_users_pipeline = [
+                {"$match": {"status": "completed"}},
+                {
+                    "$addFields": {
+                        "_answer_scores": {
+                            "$map": {
+                                "input": {"$ifNull": ["$answers", []]},
+                                "as": "a",
+                                "in": {
+                                    "$ifNull": [
+                                        "$$a.content_score",
+                                        {"$ifNull": ["$$a.overall_score", 0]}
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "_interview_score": {
+                            "$cond": {
+                                "if": {"$gt": [{"$size": "$_answer_scores"}, 0]},
+                                "then": {"$avg": "$_answer_scores"},
+                                "else": 0
+                            }
+                        }
+                    }
+                },
+                {
+                    "$group": {
+                        "_id": "$user_id",
+                        "avg_score": {"$avg": "$_interview_score"},
+                        "interviews_completed": {"$sum": 1},
+                    }
+                },
+                {"$match": {"avg_score": {"$gt": 0}}},
+            ]
+
+            # Count users with higher score
+            rank = 1
+            total_active = 0
+            async for doc in db.interviews.aggregate(all_users_pipeline):
+                total_active += 1
+                if doc["_id"] != user_id:
+                    if doc["avg_score"] > user_score:
+                        rank += 1
+                    elif doc["avg_score"] == user_score and doc["interviews_completed"] > user_interviews:
+                        rank += 1
+
+            total_users = await db.users.count_documents({})
+
+            # Percentile: % of users you scored better than
+            percentile = round(
+                ((total_active - rank) / max(total_active, 1)) * 100, 1
+            ) if total_active > 0 else 0
+
+            logger.debug(
+                "[DB] get_user_rank | user_id={} | rank={} | percentile={}",
+                user_id, rank, percentile,
+            )
+
+            return {
+                "rank": rank,
+                "score": round(user_score, 1),
+                "interviews_completed": user_interviews,
+                "total_users": total_users,
+                "total_active_users": total_active,
+                "percentile": percentile,
+                "name": user_name,
+                "role": user_role,
+            }
+
+        except Exception as exc:
+            logger.error("[DB] get_user_rank failed | user_id={} | error={}", user_id, exc)
+            return None
+
+    async def get_total_user_count(self) -> int:
+        """Return total number of registered users."""
+        db = self._get_db()
+        if db is None:
+            return 0
+
+        try:
+            return await db.users.count_documents({})
+        except Exception as exc:
+            logger.error("[DB] get_total_user_count failed | error={}", exc)
+            return 0
+
+    async def update_leaderboard_stats(self, user_id: str) -> bool:
+        """
+        Recalculate and store rank + percentile for a specific user.
+
+        Called after each interview completes to keep leaderboard data fresh.
+
+        Args:
+            user_id: The user's unique identifier.
+
+        Returns:
+            True if stats were updated, False otherwise.
+        """
+        db = self._get_db()
+        if db is None:
+            return False
+
+        try:
+            rank_data = await self.get_user_rank(user_id)
+            if not rank_data:
+                return False
+
+            result = await db.users.update_one(
+                {"_id": user_id},
+                {
+                    "$set": {
+                        "rank": rank_data["rank"],
+                        "percentile": rank_data["percentile"],
+                        "updated_at": datetime.utcnow(),
+                    }
+                },
+            )
+            if result.modified_count > 0:
+                logger.info(
+                    "[DB] Leaderboard stats updated | user_id={} | rank={} | percentile={}",
+                    user_id, rank_data["rank"], rank_data["percentile"],
+                )
+                return True
+            return False
+
+        except Exception as exc:
+            logger.error("[DB] update_leaderboard_stats failed | user_id={} | error={}", user_id, exc)
             return False
 
 

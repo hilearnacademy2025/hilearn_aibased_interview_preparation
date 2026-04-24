@@ -266,6 +266,7 @@ from app.core.config import get_settings
 from app.core.exceptions import register_exception_handlers
 from app.api.routes import health, interview, auth, admin
 from app.api.routes import payment
+from app.api.routes import leaderboard
 
 # ─────────────────────────────────────────────────────────
 # Settings
@@ -461,6 +462,7 @@ app.include_router(interview.router, prefix="/api/v1")
 app.include_router(auth.router, prefix="/api/v1")
 app.include_router(admin.router, prefix="/api/v1")
 app.include_router(payment.router, prefix="/api/v1")
+app.include_router(leaderboard.router, prefix="/api/v1")
 
 
 # ─────────────────────────────────────────────────────────

@@ -181,7 +181,7 @@ import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import {
   LayoutDashboard, Users, BarChart3, Settings,
-  LogOut, Menu, X, ChevronRight, Bell, Shield, Brain
+  LogOut, Menu, X, ChevronRight, Bell, Shield, Brain, Trophy
 } from 'lucide-react'
 
 const adminNavItems = [
@@ -190,6 +190,7 @@ const adminNavItems = [
     items: [
       { icon: LayoutDashboard, label: 'Dashboard', href: '/admin' },
       { icon: BarChart3,       label: 'Analytics', href: '/admin/analytics' },
+      { icon: Trophy,          label: 'Leaderboard', href: '/admin/leaderboard' },
     ],
   },
   {
