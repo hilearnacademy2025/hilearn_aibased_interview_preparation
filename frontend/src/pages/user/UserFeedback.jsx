@@ -1,4 +1,6 @@
 
+
+
 // import { useState, useEffect } from 'react'
 // import { motion, AnimatePresence } from 'framer-motion'
 // import { Link } from 'react-router-dom'
@@ -7,24 +9,29 @@
 //   BookOpen, ExternalLink, ChevronDown, ChevronUp,
 //   Star, Zap, MessageSquare, BarChart3
 // } from 'lucide-react'
+// // import { useState } from 'react'
+// // import { motion } from 'framer-motion'
+// // import { Link } from 'react-router-dom'
+// import { Award, BarChart3, CheckCircle, ArrowRight, Mic, Clock, Zap, Mail, Loader } from 'lucide-react'
+// import { sendResultsEmail } from '../../utils/api'
 
 // const LMS_URL = 'https://hilearn-lms-tool.vercel.app/courses'
 
 // function getLMSRec(score, improvements = [], jobRole = '') {
 //   const text = (improvements.join(' ') + ' ' + jobRole).toLowerCase()
 //   if (text.includes('data science') || text.includes('data analyst'))
-//     return { tag: 'Data Science', title: 'Data Science & Analytics Masterclass', desc: 'Python, SQL, ML aur visualization — placement-ready curriculum', accent: '#6366f1' }
+//     return { tag: 'Data Science', title: 'Data Science & Analytics Masterclass', desc: 'Python, SQL, ML and visualization — placement-ready curriculum', accent: '#6366f1' }
 //   if (text.includes('machine learning') || text.includes(' ml ') || text.includes(' ai ') || text.includes('deep learning'))
 //     return { tag: 'AI / ML', title: 'AI & Machine Learning Bootcamp', desc: 'Transformers, LLMs, model deployment — industry-level AI skills', accent: '#0ea5e9' }
 //   if (text.includes('marketing') || text.includes('digital') || text.includes('seo'))
-//     return { tag: 'Digital Marketing', title: 'Digital Marketing Certification', desc: 'SEO, paid ads, content strategy aur analytics — full-stack marketer bano', accent: '#f59e0b' }
+//     return { tag: 'Digital Marketing', title: 'Digital Marketing Certification', desc: 'SEO, paid ads, content strategy and analytics — become a full-stack marketer', accent: '#f59e0b' }
 //   if (text.includes('data') || text.includes('analytics') || text.includes('sql'))
-//     return { tag: 'Data Analytics', title: 'Data Analytics with Python & SQL', desc: 'Real-world projects se analytics skills strong karo', accent: '#6366f1' }
+//     return { tag: 'Data Analytics', title: 'Data Analytics with Python & SQL', desc: 'Strengthen your analytics skills with real-world projects', accent: '#6366f1' }
 //   if (score >= 8)
-//     return { tag: 'Advanced', title: 'Advanced Interview Preparation Bundle', desc: 'System design, leadership rounds aur executive communication', accent: '#10b981' }
+//     return { tag: 'Advanced', title: 'Advanced Interview Preparation Bundle', desc: 'System design, leadership rounds & executive communication', accent: '#10b981' }
 //   if (score >= 5)
-//     return { tag: 'Intermediate', title: 'Core Interview Skills Program', desc: 'DSA, system design basics aur communication clarity improve karo', accent: '#c8601a' }
-//   return { tag: 'Foundation', title: 'Interview Prep Foundation Course', desc: 'Communication, problem-solving aur core technical concepts se shuruat karo', accent: '#c8601a' }
+//     return { tag: 'Intermediate', title: 'Core Interview Skills Program', desc: 'Improve DSA, system design basics & communication clarity', accent: '#c8601a' }
+//   return { tag: 'Foundation', title: 'Interview Prep Foundation Course', desc: 'Start with communication, problem-solving & core technical concepts', accent: '#c8601a' }
 // }
 
 // function ScoreRing({ score, max = 10 }) {
@@ -46,11 +53,35 @@
 //     requestAnimationFrame(run)
 //   }, [score])
 
+//   // Email state
+//   const [sendingEmail, setSendingEmail] = useState(false)
+//   const [emailSent, setEmailSent] = useState(false)
+//   const [emailError, setEmailError] = useState('')
+
+//   const sessionId = completeFeedback?.session_id || localStorage.getItem('hilearn_session_id') || ''
+
+//   const handleSendEmail = async () => {
+//     if (!sessionId) {
+//       setEmailError('No session found to send results for.')
+//       return
+//     }
+//     setSendingEmail(true)
+//     setEmailError('')
+//     try {
+//       await sendResultsEmail(sessionId)
+//       setEmailSent(true)
+//     } catch (err) {
+//       setEmailError(err.message || 'Failed to send email.')
+//     } finally {
+//       setSendingEmail(false)
+//     }
+//   }
+
 //   return (
 //     <div className="flex flex-col items-center gap-2">
 //       <div className="relative" style={{ width: 120, height: 120 }}>
 //         <svg viewBox="0 0 110 110" style={{ width: 120, height: 120, transform: 'rotate(-90deg)' }}>
-//           <circle cx="55" cy="55" r={r} fill="none" stroke="#f0ede9" strokeWidth="9"/>
+//           <circle cx="55" cy="55" r={r} fill="none" stroke="#f0ede9" strokeWidth="9" />
 //           <motion.circle cx="55" cy="55" r={r} fill="none"
 //             stroke={color} strokeWidth="9" strokeLinecap="round"
 //             strokeDasharray={circ}
@@ -93,24 +124,24 @@
 
 //   // hilearn_complete_feedback = full SubmitAnswerResponse
 //   // { session_id, feedback: { overall_score, content_score, strengths, improvements, ... }, questions_answered, ... }
-//   const raw       = JSON.parse(localStorage.getItem('hilearn_complete_feedback') || 'null')
-//   const latest    = JSON.parse(localStorage.getItem('hilearn_latest_feedback') || 'null')
-//   const session   = JSON.parse(localStorage.getItem('hilearn_interview_session') || 'null')
+//   const raw = JSON.parse(localStorage.getItem('hilearn_complete_feedback') || 'null')
+//   const latest = JSON.parse(localStorage.getItem('hilearn_latest_feedback') || 'null')
+//   const session = JSON.parse(localStorage.getItem('hilearn_interview_session') || 'null')
 
 //   const fb = raw?.feedback || raw || latest || {}
 
-//   const score      = fb.overall_score      ?? 0
-//   const cScore     = fb.content_score      ?? null
-//   const compScore  = fb.completeness_score ?? null
-//   const relScore   = fb.relevance_score    ?? null
-//   const strengths  = fb.strengths          || []
-//   const improv     = fb.improvements       || []
-//   const hint       = fb.ideal_answer_hint  || null
-//   const voice      = fb.communication      || null
+//   const score = fb.overall_score ?? 0
+//   const cScore = fb.content_score ?? null
+//   const compScore = fb.completeness_score ?? null
+//   const relScore = fb.relevance_score ?? null
+//   const strengths = fb.strengths || []
+//   const improv = fb.improvements || []
+//   const hint = fb.ideal_answer_hint || null
+//   const voice = fb.communication || null
 
 //   const jobRole = raw?.job_role || session?.job_role || ''
-//   const ivType  = raw?.interview_type || session?.interview_type || ''
-//   const totalQ  = raw?.questions_answered || raw?.total_questions || null
+//   const ivType = raw?.interview_type || session?.interview_type || ''
+//   const totalQ = raw?.questions_answered || raw?.total_questions || null
 
 //   const hasData = score > 0
 //   const rec = getLMSRec(score, improv, jobRole)
@@ -132,7 +163,7 @@
 //           )}
 //           {!hasData && (
 //             <p className="mt-2 text-sm text-[#9c9a96] bg-[#f9f7f4] border border-[#f0ede9] px-4 py-2 rounded-xl inline-block">
-//               Interview complete karo real feedback dekhne ke liye
+//               Complete an interview to see your real feedback
 //             </p>
 //           )}
 //         </div>
@@ -160,13 +191,13 @@
 //           </h3>
 //           {(cScore != null || compScore != null || relScore != null) ? (
 //             <div className="space-y-3.5">
-//               <Bar label="Content Quality" value={cScore}    color="#c8601a" delay={0.2} />
-//               <Bar label="Completeness"    value={compScore} color="#6366f1" delay={0.3} />
-//               <Bar label="Relevance"       value={relScore}  color="#10b981" delay={0.4} />
+//               <Bar label="Content Quality" value={cScore} color="#c8601a" delay={0.2} />
+//               <Bar label="Completeness" value={compScore} color="#6366f1" delay={0.3} />
+//               <Bar label="Relevance" value={relScore} color="#10b981" delay={0.4} />
 //             </div>
 //           ) : (
 //             <p className="text-sm text-[#9c9a96]">
-//               {hasData ? 'Detailed breakdown next interview mein aayega.' : 'Interview complete karne ke baad yahan dikhega.'}
+//               {hasData ? 'Detailed breakdown will appear in your next interview.' : 'Complete an interview to see the breakdown here.'}
 //             </p>
 //           )}
 //         </motion.div>
@@ -193,7 +224,7 @@
 //               ))}
 //             </ul>
 //           ) : (
-//             <p className="text-sm text-[#9c9a96]">Interview dene ke baad yahan aayega.</p>
+//             <p className="text-sm text-[#9c9a96]">Will appear after you take an interview.</p>
 //           )}
 //         </motion.div>
 
@@ -201,7 +232,7 @@
 //           className="surface-card p-6"
 //         >
 //           <h2 className="font-bold text-[#0f1f3d] mb-4 flex items-center gap-2">
-//             <TrendingUp size={16} className="text-[#c8601a]" /> Improve Karo
+//             <TrendingUp size={16} className="text-[#c8601a]" /> Areas to Improve
 //           </h2>
 //           {improv.length > 0 ? (
 //             <ul className="space-y-2.5">
@@ -216,7 +247,7 @@
 //               ))}
 //             </ul>
 //           ) : (
-//             <p className="text-sm text-[#9c9a96]">Interview dene ke baad yahan aayega.</p>
+//             <p className="text-sm text-[#9c9a96]">Will appear after you take an interview.</p>
 //           )}
 //         </motion.div>
 //       </div>
@@ -252,7 +283,7 @@
 //                 )}
 //               </div>
 //               <div className="space-y-2.5">
-//                 <Bar label="Clarity"    value={voice.clarity_score    != null ? +voice.clarity_score.toFixed(1)    : null} color="#10b981" />
+//                 <Bar label="Clarity" value={voice.clarity_score != null ? +voice.clarity_score.toFixed(1) : null} color="#10b981" />
 //                 <Bar label="Confidence" value={voice.confidence_score != null ? +voice.confidence_score.toFixed(1) : null} color="#6366f1" />
 //               </div>
 //               {voice.filler_words_detected?.length > 0 && (
@@ -293,10 +324,16 @@
 //       {/* LMS Banner — full width */}
 //       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}
 //         className="rounded-2xl overflow-hidden border border-[#e8e4df]"
+//       {/* CTA Buttons */}
+//       <motion.div
+//         initial={{ opacity: 0, y: 10 }}
+//         animate={{ opacity: 1, y: 0 }}
+//         transition={{ delay: 0.35 }}
+//         className="flex flex-wrap gap-3"
 //       >
 //         <div className="flex items-center gap-2 px-6 py-2.5" style={{ background: rec.accent }}>
 //           <BookOpen size={14} className="text-white" />
-//           <span className="text-white text-xs font-bold tracking-wider uppercase">HiLearn Academy — Aapke liye recommended</span>
+//           <span className="text-white text-xs font-bold tracking-wider uppercase">HiLearn Academy — Recommended for you</span>
 //         </div>
 
 //         <div className="p-6" style={{ background: `linear-gradient(135deg, ${rec.accent}08 0%, #fff 60%)` }}>
@@ -315,7 +352,7 @@
 //               <p className="text-sm text-[#5c5a57] mt-1">{rec.desc}</p>
 //               <div className="flex items-center gap-3 mt-2.5">
 //                 <div className="flex gap-0.5">
-//                   {[1,2,3,4,5].map(i => <Star key={i} size={11} fill={rec.accent} color={rec.accent} />)}
+//                   {[1, 2, 3, 4, 5].map(i => <Star key={i} size={11} fill={rec.accent} color={rec.accent} />)}
 //                 </div>
 //                 <span className="text-xs text-[#9c9a96]">HiLearn certified · Self-paced</span>
 //               </div>
@@ -325,23 +362,23 @@
 //               className="flex items-center gap-2 px-5 py-3 rounded-xl font-bold text-sm text-white flex-shrink-0 self-start transition-all hover:opacity-90 hover:scale-105"
 //               style={{ background: rec.accent }}
 //             >
-//               Course Dekho <ExternalLink size={14} />
+//               View Course <ExternalLink size={14} />
 //             </a>
 //           </div>
 
 //           <div className="mt-4 pt-4 border-t border-[#f0ede9] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
 //             <p className="text-xs text-[#9c9a96]">
 //               {hasData
-//                 ? score < 5 ? '💡 Score improve karne ka best tarika — structured learning lo'
-//                 : score < 8 ? '📈 Good start! Is course se skills aur strong karo'
-//                 : '🏆 Excellent! Advanced topics explore karo'
-//                 : '📚 Interview prep ke saath structured learning bhi zaruri hai'}
+//                 ? score < 5 ? '💡 Best way to improve your score — take structured learning'
+//                   : score < 8 ? '📈 Good start! Strengthen your skills further with this course'
+//                     : '🏆 Excellent! Explore advanced topics'
+//                 : '📚 Structured learning is essential alongside interview prep'}
 //             </p>
 //             <a href={LMS_URL} target="_blank" rel="noopener noreferrer"
 //               className="text-xs font-semibold flex items-center gap-1 whitespace-nowrap hover:opacity-70 transition"
 //               style={{ color: rec.accent }}
 //             >
-//               Saare courses dekho <ExternalLink size={11} />
+//               View all courses <ExternalLink size={11} />
 //             </a>
 //           </div>
 //         </div>
@@ -358,6 +395,24 @@
 //         </Link>
 //         <Link to="/user"
 //           className="px-6 py-3.5 border-2 border-[#e0dbd3] rounded-full font-semibold text-[#5c5a57] hover:border-[#c8601a]/50 transition"
+//         {hasRealData && sessionId && (
+//           <button
+//             onClick={handleSendEmail}
+//             disabled={sendingEmail || emailSent}
+//             className="flex items-center justify-center gap-2 px-6 py-4 bg-[#0f1f3d] text-white rounded-full font-bold hover:bg-[#1a3a6b] transition disabled:opacity-60"
+//           >
+//             {sendingEmail ? (
+//               <><Loader size={14} className="animate-spin" /> Sending...</>
+//             ) : emailSent ? (
+//               <><CheckCircle size={14} /> Sent ✉️</>
+//             ) : (
+//               <><Mail size={14} /> Email Results</>
+//             )}
+//           </button>
+//         )}
+//         <Link
+//           to="/user"
+//           className="px-6 py-4 border-2 border-[#e0dbd3] rounded-full font-semibold text-[#5c5a57] hover:border-[#c8601a]/50 transition"
 //         >
 //           Dashboard
 //         </Link>
@@ -368,58 +423,71 @@
 //           <BookOpen size={15} /> HiLearn Courses
 //         </a>
 //       </motion.div>
+
+//       {emailError && (
+//         <p className="text-sm text-rose-600 bg-rose-50 border border-rose-200 rounded-xl px-4 py-2">
+//           {emailError}
+//         </p>
+//       )}
+//       {emailSent && (
+//         <p className="text-sm text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-2">
+//           ✅ Results sent to your registered email!
+//         </p>
+//       )}
 //     </div>
 //   )
-// }
+// } 
 
 
 
-import { useState, useEffect } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
-import { Link } from 'react-router-dom'
+
+import { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Link } from 'react-router-dom';
 import {
   CheckCircle, TrendingUp, Mic, ArrowRight,
   BookOpen, ExternalLink, ChevronDown, ChevronUp,
-  Star, Zap, MessageSquare, BarChart3
-} from 'lucide-react'
+  Star, Zap, MessageSquare, BarChart3, Award, Clock, Mail, Loader
+} from 'lucide-react';
+import { sendResultsEmail } from '../../utils/api';
 
-const LMS_URL = 'https://hilearn-lms-tool.vercel.app/courses'
+const LMS_URL = 'https://hilearn-lms-tool.vercel.app/courses';
 
 function getLMSRec(score, improvements = [], jobRole = '') {
-  const text = (improvements.join(' ') + ' ' + jobRole).toLowerCase()
+  const text = (improvements.join(' ') + ' ' + jobRole).toLowerCase();
   if (text.includes('data science') || text.includes('data analyst'))
-    return { tag: 'Data Science', title: 'Data Science & Analytics Masterclass', desc: 'Python, SQL, ML and visualization — placement-ready curriculum', accent: '#6366f1' }
+    return { tag: 'Data Science', title: 'Data Science & Analytics Masterclass', desc: 'Python, SQL, ML and visualization — placement-ready curriculum', accent: '#6366f1' };
   if (text.includes('machine learning') || text.includes(' ml ') || text.includes(' ai ') || text.includes('deep learning'))
-    return { tag: 'AI / ML', title: 'AI & Machine Learning Bootcamp', desc: 'Transformers, LLMs, model deployment — industry-level AI skills', accent: '#0ea5e9' }
+    return { tag: 'AI / ML', title: 'AI & Machine Learning Bootcamp', desc: 'Transformers, LLMs, model deployment — industry-level AI skills', accent: '#0ea5e9' };
   if (text.includes('marketing') || text.includes('digital') || text.includes('seo'))
-    return { tag: 'Digital Marketing', title: 'Digital Marketing Certification', desc: 'SEO, paid ads, content strategy and analytics — become a full-stack marketer', accent: '#f59e0b' }
+    return { tag: 'Digital Marketing', title: 'Digital Marketing Certification', desc: 'SEO, paid ads, content strategy and analytics — become a full-stack marketer', accent: '#f59e0b' };
   if (text.includes('data') || text.includes('analytics') || text.includes('sql'))
-    return { tag: 'Data Analytics', title: 'Data Analytics with Python & SQL', desc: 'Strengthen your analytics skills with real-world projects', accent: '#6366f1' }
+    return { tag: 'Data Analytics', title: 'Data Analytics with Python & SQL', desc: 'Strengthen your analytics skills with real-world projects', accent: '#6366f1' };
   if (score >= 8)
-    return { tag: 'Advanced', title: 'Advanced Interview Preparation Bundle', desc: 'System design, leadership rounds & executive communication', accent: '#10b981' }
+    return { tag: 'Advanced', title: 'Advanced Interview Preparation Bundle', desc: 'System design, leadership rounds & executive communication', accent: '#10b981' };
   if (score >= 5)
-    return { tag: 'Intermediate', title: 'Core Interview Skills Program', desc: 'Improve DSA, system design basics & communication clarity', accent: '#c8601a' }
-  return { tag: 'Foundation', title: 'Interview Prep Foundation Course', desc: 'Start with communication, problem-solving & core technical concepts', accent: '#c8601a' }
+    return { tag: 'Intermediate', title: 'Core Interview Skills Program', desc: 'Improve DSA, system design basics & communication clarity', accent: '#c8601a' };
+  return { tag: 'Foundation', title: 'Interview Prep Foundation Course', desc: 'Start with communication, problem-solving & core technical concepts', accent: '#c8601a' };
 }
 
 function ScoreRing({ score, max = 10 }) {
-  const [val, setVal] = useState(0)
-  const r = 44, circ = 2 * Math.PI * r
-  const pct = Math.min(score / max, 1)
-  const color = score >= 8 ? '#10b981' : score >= 5 ? '#c8601a' : score > 0 ? '#ef4444' : '#d1cdc7'
-  const label = score >= 8 ? 'Excellent!' : score >= 5 ? 'Good Job!' : score > 0 ? 'Keep Going!' : 'No data yet'
+  const [val, setVal] = useState(0);
+  const r = 44, circ = 2 * Math.PI * r;
+  const pct = Math.min(score / max, 1);
+  const color = score >= 8 ? '#10b981' : score >= 5 ? '#c8601a' : score > 0 ? '#ef4444' : '#d1cdc7';
+  const label = score >= 8 ? 'Excellent!' : score >= 5 ? 'Good Job!' : score > 0 ? 'Keep Going!' : 'No data yet';
 
   useEffect(() => {
-    if (!score) return
-    let start = null
+    if (!score) return;
+    let start = null;
     const run = ts => {
-      if (!start) start = ts
-      const p = Math.min((ts - start) / 1200, 1)
-      setVal(+(score * p).toFixed(1))
-      if (p < 1) requestAnimationFrame(run)
-    }
-    requestAnimationFrame(run)
-  }, [score])
+      if (!start) start = ts;
+      const p = Math.min((ts - start) / 1200, 1);
+      setVal(+(score * p).toFixed(1));
+      if (p < 1) requestAnimationFrame(run);
+    };
+    requestAnimationFrame(run);
+  }, [score]);
 
   return (
     <div className="flex flex-col items-center gap-2">
@@ -441,11 +509,11 @@ function ScoreRing({ score, max = 10 }) {
       </div>
       <span className="text-sm font-bold" style={{ color }}>{label}</span>
     </div>
-  )
+  );
 }
 
 function Bar({ label, value, max = 10, color = '#c8601a', delay = 0 }) {
-  if (value == null) return null
+  if (value == null) return null;
   return (
     <div className="space-y-1.5">
       <div className="flex justify-between items-center">
@@ -460,39 +528,56 @@ function Bar({ label, value, max = 10, color = '#c8601a', delay = 0 }) {
         />
       </div>
     </div>
-  )
+  );
 }
 
 export default function UserFeedback() {
-  const [hintOpen, setHintOpen] = useState(false)
+  const [hintOpen, setHintOpen] = useState(false);
+  const [sendingEmail, setSendingEmail] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
+  const [emailError, setEmailError] = useState('');
 
-  // hilearn_complete_feedback = full SubmitAnswerResponse
-  // { session_id, feedback: { overall_score, content_score, strengths, improvements, ... }, questions_answered, ... }
-  const raw = JSON.parse(localStorage.getItem('hilearn_complete_feedback') || 'null')
-  const latest = JSON.parse(localStorage.getItem('hilearn_latest_feedback') || 'null')
-  const session = JSON.parse(localStorage.getItem('hilearn_interview_session') || 'null')
+  const raw = JSON.parse(localStorage.getItem('hilearn_complete_feedback') || 'null');
+  const latest = JSON.parse(localStorage.getItem('hilearn_latest_feedback') || 'null');
+  const session = JSON.parse(localStorage.getItem('hilearn_interview_session') || 'null');
 
-  const fb = raw?.feedback || raw || latest || {}
+  const fb = raw?.feedback || raw || latest || {};
+  const score = fb.overall_score ?? 0;
+  const cScore = fb.content_score ?? null;
+  const compScore = fb.completeness_score ?? null;
+  const relScore = fb.relevance_score ?? null;
+  const strengths = fb.strengths || [];
+  const improv = fb.improvements || [];
+  const hint = fb.ideal_answer_hint || null;
+  const voice = fb.communication || null;
 
-  const score = fb.overall_score ?? 0
-  const cScore = fb.content_score ?? null
-  const compScore = fb.completeness_score ?? null
-  const relScore = fb.relevance_score ?? null
-  const strengths = fb.strengths || []
-  const improv = fb.improvements || []
-  const hint = fb.ideal_answer_hint || null
-  const voice = fb.communication || null
+  const jobRole = raw?.job_role || session?.job_role || '';
+  const ivType = raw?.interview_type || session?.interview_type || '';
+  const totalQ = raw?.questions_answered || raw?.total_questions || null;
+  const sessionId = raw?.session_id || localStorage.getItem('hilearn_session_id') || '';
+  const hasData = score > 0;
+  const rec = getLMSRec(score, improv, jobRole);
+  const hasRealData = hasData && !!sessionId;
 
-  const jobRole = raw?.job_role || session?.job_role || ''
-  const ivType = raw?.interview_type || session?.interview_type || ''
-  const totalQ = raw?.questions_answered || raw?.total_questions || null
-
-  const hasData = score > 0
-  const rec = getLMSRec(score, improv, jobRole)
+  const handleSendEmail = async () => {
+    if (!sessionId) {
+      setEmailError('No session found to send results for.');
+      return;
+    }
+    setSendingEmail(true);
+    setEmailError('');
+    try {
+      await sendResultsEmail(sessionId);
+      setEmailSent(true);
+    } catch (err) {
+      setEmailError(err.message || 'Failed to send email.');
+    } finally {
+      setSendingEmail(false);
+    }
+  };
 
   return (
     <div className="space-y-5">
-
       {/* Header */}
       <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
         className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
@@ -518,7 +603,7 @@ export default function UserFeedback() {
         </Link>
       </motion.div>
 
-      {/* Score + Breakdown — full width 2 col */}
+      {/* Score + Breakdown */}
       <div className="grid grid-cols-1 lg:grid-cols-[220px_1fr] gap-5">
         <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.1 }}
           className="surface-card p-6 flex flex-col items-center justify-center gap-1"
@@ -526,7 +611,6 @@ export default function UserFeedback() {
           <ScoreRing score={score} />
           <p className="text-xs text-[#9c9a96] uppercase tracking-widest mt-1">Overall Score</p>
         </motion.div>
-
         <motion.div initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.15 }}
           className="surface-card p-6 flex flex-col justify-center"
         >
@@ -571,7 +655,6 @@ export default function UserFeedback() {
             <p className="text-sm text-[#9c9a96]">Will appear after you take an interview.</p>
           )}
         </motion.div>
-
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}
           className="surface-card p-6"
         >
@@ -637,7 +720,6 @@ export default function UserFeedback() {
               )}
             </motion.div>
           )}
-
           {hint && (
             <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}
               className="surface-card overflow-hidden"
@@ -665,7 +747,7 @@ export default function UserFeedback() {
         </div>
       )}
 
-      {/* LMS Banner — full width */}
+      {/* LMS Banner - Course Recommendation */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}
         className="rounded-2xl overflow-hidden border border-[#e8e4df]"
       >
@@ -673,14 +755,12 @@ export default function UserFeedback() {
           <BookOpen size={14} className="text-white" />
           <span className="text-white text-xs font-bold tracking-wider uppercase">HiLearn Academy — Recommended for you</span>
         </div>
-
         <div className="p-6" style={{ background: `linear-gradient(135deg, ${rec.accent}08 0%, #fff 60%)` }}>
           <div className="flex flex-col sm:flex-row sm:items-start gap-5">
             <div className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0"
               style={{ background: rec.accent + '15' }}>
               <BookOpen size={24} style={{ color: rec.accent }} />
             </div>
-
             <div className="flex-1 min-w-0">
               <span className="inline-block text-xs font-bold px-2.5 py-0.5 rounded-full mb-2"
                 style={{ background: rec.accent + '18', color: rec.accent }}>
@@ -695,7 +775,6 @@ export default function UserFeedback() {
                 <span className="text-xs text-[#9c9a96]">HiLearn certified · Self-paced</span>
               </div>
             </div>
-
             <a href={LMS_URL} target="_blank" rel="noopener noreferrer"
               className="flex items-center gap-2 px-5 py-3 rounded-xl font-bold text-sm text-white flex-shrink-0 self-start transition-all hover:opacity-90 hover:scale-105"
               style={{ background: rec.accent }}
@@ -703,7 +782,6 @@ export default function UserFeedback() {
               View Course <ExternalLink size={14} />
             </a>
           </div>
-
           <div className="mt-4 pt-4 border-t border-[#f0ede9] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
             <p className="text-xs text-[#9c9a96]">
               {hasData
@@ -722,17 +800,33 @@ export default function UserFeedback() {
         </div>
       </motion.div>
 
-      {/* CTAs */}
+      {/* CTA Buttons + Email */}
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }}
-        className="flex gap-3 flex-wrap"
+        className="flex flex-wrap gap-3"
       >
         <Link to="/user/interview-setup"
           className="flex-1 flex items-center justify-center gap-2 bg-[#c8601a] text-white py-3.5 rounded-full font-bold shadow-lg shadow-[#c8601a]/20 hover:bg-[#b0541a] transition min-w-[160px]"
         >
           <Zap size={16} /> Practice Again
         </Link>
-        <Link to="/user"
-          className="px-6 py-3.5 border-2 border-[#e0dbd3] rounded-full font-semibold text-[#5c5a57] hover:border-[#c8601a]/50 transition"
+        {hasRealData && (
+          <button
+            onClick={handleSendEmail}
+            disabled={sendingEmail || emailSent}
+            className="flex items-center justify-center gap-2 px-6 py-4 bg-[#0f1f3d] text-white rounded-full font-bold hover:bg-[#1a3a6b] transition disabled:opacity-60"
+          >
+            {sendingEmail ? (
+              <><Loader size={14} className="animate-spin" /> Sending...</>
+            ) : emailSent ? (
+              <><CheckCircle size={14} /> Sent ✉️</>
+            ) : (
+              <><Mail size={14} /> Email Results</>
+            )}
+          </button>
+        )}
+        <Link
+          to="/user"
+          className="px-6 py-4 border-2 border-[#e0dbd3] rounded-full font-semibold text-[#5c5a57] hover:border-[#c8601a]/50 transition"
         >
           Dashboard
         </Link>
@@ -743,6 +837,17 @@ export default function UserFeedback() {
           <BookOpen size={15} /> HiLearn Courses
         </a>
       </motion.div>
+
+      {emailError && (
+        <p className="text-sm text-rose-600 bg-rose-50 border border-rose-200 rounded-xl px-4 py-2">
+          {emailError}
+        </p>
+      )}
+      {emailSent && (
+        <p className="text-sm text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-2">
+          ✅ Results sent to your registered email!
+        </p>
+      )}
     </div>
-  )
-} 
+  );
+}

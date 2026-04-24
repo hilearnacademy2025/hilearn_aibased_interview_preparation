@@ -845,6 +845,7 @@ from app.models.db_models import (
     AnalyticsDocument,
     FeedbackDocument,
     InterviewDocument,
+    MCQQuestionDocument,
     QuestionDocument,
     UserDocument,
 )
@@ -967,6 +968,16 @@ class DatabaseService:
             ]
             await db.questions.create_indexes(questions_indexes)
             logger.info("[DB] Indexes created on 'questions' collection")
+
+            # ── MCQ Questions collection ───────────────────────────────
+            mcq_indexes = [
+                IndexModel(
+                    [("job_role", ASCENDING), ("interview_type", ASCENDING), ("difficulty", ASCENDING)],
+                    name="idx_mcq_questions_role_type_diff",
+                ),
+            ]
+            await db.mcq_questions.create_indexes(mcq_indexes)
+            logger.info("[DB] Indexes created on 'mcq_questions' collection")
 
             logger.success("[DB] All indexes created successfully")
 
@@ -1424,6 +1435,105 @@ class DatabaseService:
         except Exception as exc:
             logger.warning("[DB] Health check failed | error={}", exc)
             return {"connected": False, "status": "unhealthy", "error": str(exc)}
+
+    # ───────────────────────────────────────────────────────────────────────
+    # MCQ Question CRUD
+    # ───────────────────────────────────────────────────────────────────────
+
+    async def save_mcq_question(self, question: MCQQuestionDocument) -> Optional[str]:
+        """
+        Insert an MCQ question into the ``mcq_questions`` collection.
+
+        Args:
+            question: Validated MCQQuestionDocument instance.
+
+        Returns:
+            The inserted question_id, or None on failure.
+        """
+        db = self._get_db()
+        if db is None:
+            return None
+
+        try:
+            doc = question.to_mongo()
+            result = await db.mcq_questions.insert_one(doc)
+            logger.debug("[DB] MCQ question saved | question_id={}", question.question_id)
+            return str(result.inserted_id)
+        except Exception as exc:
+            logger.error("[DB] save_mcq_question failed | error={}", exc)
+            return None
+
+    async def get_mcq_questions(
+        self,
+        job_role: Optional[str] = None,
+        interview_type: Optional[str] = None,
+        difficulty: Optional[str] = None,
+        limit: int = 10,
+    ) -> List[MCQQuestionDocument]:
+        """
+        Query MCQ questions with optional filters.
+
+        Args:
+            job_role: Filter by target job role.
+            interview_type: Filter by interview type.
+            difficulty: Filter by difficulty level.
+            limit: Maximum number of results.
+
+        Returns:
+            List of MCQQuestionDocument instances.
+        """
+        db = self._get_db()
+        if db is None:
+            return []
+
+        try:
+            query: Dict[str, Any] = {}
+            if job_role:
+                query["job_role"] = job_role
+            if interview_type:
+                query["interview_type"] = interview_type
+            if difficulty:
+                query["difficulty"] = difficulty
+
+            cursor = db.mcq_questions.find(query).limit(limit)
+            results = []
+            async for doc in cursor:
+                results.append(MCQQuestionDocument.from_mongo(doc))
+            logger.debug("[DB] get_mcq_questions | count={}", len(results))
+            return results
+        except Exception as exc:
+            logger.error("[DB] get_mcq_questions failed | error={}", exc)
+            return []
+
+    async def add_mcq_answer_to_interview(
+        self, session_id: str, mcq_answer: Dict[str, Any]
+    ) -> bool:
+        """
+        Push a new MCQ answer onto the interview's mcq_answers array.
+
+        Args:
+            session_id: The session's unique identifier.
+            mcq_answer: MCQ answer dict to append.
+
+        Returns:
+            True if the document was modified, False otherwise.
+        """
+        db = self._get_db()
+        if db is None:
+            return False
+
+        try:
+            result = await db.interviews.update_one(
+                {"_id": session_id},
+                {"$push": {"mcq_answers": mcq_answer}},
+            )
+            if result.modified_count > 0:
+                logger.debug("[DB] MCQ answer added | session_id={}", session_id)
+                return True
+            return False
+        except Exception as exc:
+            logger.error("[DB] add_mcq_answer failed | session_id={} | error={}", session_id, exc)
+            return False
 
 
 # ── Module-level service singleton ─────────────────────────────────────────

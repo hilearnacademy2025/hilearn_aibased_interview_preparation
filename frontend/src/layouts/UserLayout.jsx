@@ -3,18 +3,18 @@ import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import {
   LayoutDashboard, Mic, BarChart3, Settings, LogOut,
-  Menu, X, ChevronRight, Bell, Award, Zap
+  Menu, X, ChevronRight, Bell, Award, Zap, FileQuestion
 } from 'lucide-react'
 
 const userNavItems = [
   {
     group: 'MAIN',
     items: [
-      { icon: LayoutDashboard, label: 'Dashboard',       href: '/user' },
-      { icon: Mic,             label: 'Mock Interviews', href: '/user/interview-setup' },
-      // { icon: FileUp,          label: 'Upload Resume',   href: '/user/resume-upload' },
-      { icon: BarChart3,       label: 'My Progress',     href: '/user/analytics' },
-      { icon: Award,           label: 'My Feedback',     href: '/user/feedback' },
+      { icon: LayoutDashboard, label: 'Dashboard', href: '/user' },
+      { icon: Mic, label: 'Mock Interviews', href: '/user/interview-setup' },
+      // { icon: FileQuestion, label: 'MCQ Quiz', href: '/user/mcq-interview' },
+      { icon: BarChart3, label: 'My Progress', href: '/user/analytics' },
+      { icon: Award, label: 'My Feedback', href: '/user/feedback' },
     ],
   },
   {

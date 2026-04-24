@@ -42,6 +42,10 @@ numpy==1.26.4
 python-magic==0.4.27
 aiofiles==23.2.1
 
+# Resume Parsing
+PyPDF2==3.0.1              # PDF text extraction
+python-docx==1.1.0          # DOCX text extraction
+
 # WebSocket support (already included in fastapi/uvicorn)
 
 # Utilities

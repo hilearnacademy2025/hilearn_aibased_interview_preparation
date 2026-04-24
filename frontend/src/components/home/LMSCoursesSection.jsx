@@ -61,26 +61,25 @@ export default function LMSCoursesSection() {
     <section className="bg-[#f4f2ee] pt-20">
       <div className="max-w-7xl mx-auto px-4">
 
-        {/* Header */}
+        {/* Header – now matches testimonial section exactly */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
-          className="mb-14"
+          viewport={{ once: true, amount: 0.2 }}
+          className="mb-14 text-center"
         >
-          <p className="text-sm tracking-widest text-orange-500 font-semibold uppercase mb-3">
+          <p className="text-sm uppercase tracking-[0.24em] text-[#c8601a] font-semibold">
             TOP COURSES
           </p>
-
-          <h2 className="text-4xl md:text-5xl font-bold text-[#0f1f3d] mb-4">
+          <h2 className="display-font mt-3 text-4xl font-bold text-[#0f1f3d] md:text-5xl">
             Explore Our Top Courses
           </h2>
-
-          <p className="text-gray-600 max-w-xl text-lg">
+          <p className="text-gray-600 max-w-xl text-lg mx-auto mt-4">
             Industry-relevant courses with real projects, mentorship, and interview practice.
           </p>
         </motion.div>
 
-        {/* Cards */}
+        {/* Cards grid */}
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
           {courses.map((course, idx) => (
             <motion.div
@@ -101,12 +100,12 @@ export default function LMSCoursesSection() {
                 {course.title}
               </h3>
 
-              <p className="text-orange-500 text-sm font-medium mb-2">
+              <p className="text-[#c8601a] text-sm font-medium mb-2">
                 {course.subtitle}
               </p>
 
               {/* Description */}
-              <p className="text-gray-600 text-sm leading-relaxed mb-4">
+              <p className="text-[#5c5a57] text-sm leading-relaxed mb-4">
                 {course.description}
               </p>
 
@@ -143,7 +142,6 @@ export default function LMSCoursesSection() {
 
         {/* Bottom CTA */}
         <div className="mt-16 rounded-2xl border border-[#e0dbd3] bg-[#f8f6f2] p-6 flex flex-col md:flex-row items-center justify-between gap-4">
-          
           <div>
             <p className="font-semibold text-[#0f1f3d]">
               All courses include AI-powered mock interviews
@@ -157,13 +155,12 @@ export default function LMSCoursesSection() {
             href={LMS_URL}
             target="_blank"
             rel="noopener noreferrer"
-            className="bg-orange-500 text-white px-6 py-3 rounded-xl font-semibold flex items-center gap-2 hover:bg-orange-600 transition"
+            className="bg-[#c8601a] text-white px-6 py-3 rounded-xl font-semibold flex items-center gap-2 hover:bg-[#b0541a] transition"
           >
             View All Courses
             <ArrowRight size={16} />
           </a>
         </div>
-
       </div>
     </section>
   );

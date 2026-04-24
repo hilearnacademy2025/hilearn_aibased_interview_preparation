@@ -320,3 +320,115 @@ class UserInDB(BaseModel):
     role: UserRole = UserRole.STUDENT
     hashed_password: str
     created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+# ─────────────────────────────────────────────────────────
+# MCQ Models
+# ─────────────────────────────────────────────────────────
+
+class MCQQuestion(BaseModel):
+    """A single MCQ question with options and explanation."""
+    question_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    question_text: str = Field(..., description="The MCQ question text")
+    option_a: str = Field(..., description="Option A")
+    option_b: str = Field(..., description="Option B")
+    option_c: str = Field(..., description="Option C")
+    option_d: str = Field(..., description="Option D")
+    correct_answer: str = Field(..., description="Correct answer: A, B, C, or D")
+    explanation: str = Field(default="", description="Why this answer is correct")
+
+
+class StartMCQRequest(BaseModel):
+    """Payload to start a new MCQ interview session."""
+    user_id: str = Field(..., description="User's unique identifier")
+    interview_type: InterviewType = Field(
+        default=InterviewType.TECHNICAL,
+        description="Type of interview",
+    )
+    job_role: Optional[str] = Field(
+        default=None,
+        max_length=100,
+        description="Target job role",
+    )
+    difficulty: DifficultyLevel = Field(
+        default=DifficultyLevel.INTERMEDIATE,
+        description="Difficulty level",
+    )
+    num_questions: int = Field(
+        default=10,
+        ge=1,
+        le=30,
+        description="Number of MCQ questions",
+    )
+    resume_text: Optional[str] = Field(
+        default=None,
+        description="Extracted resume text for context-aware questions",
+    )
+    tech_stack: Optional[List[str]] = Field(
+        default=None,
+        description="Relevant tech stack for questions",
+    )
+
+
+class StartMCQResponse(BaseModel):
+    """Response after starting an MCQ session."""
+    session_id: str
+    user_id: str
+    interview_type: InterviewType
+    job_role: str
+    difficulty: DifficultyLevel
+    first_question: MCQQuestion
+    total_questions: int
+    started_at: datetime = Field(default_factory=datetime.utcnow)
+    message: str = "MCQ session started! Good luck 🎯"
+
+
+class SubmitMCQRequest(BaseModel):
+    """Payload for submitting an MCQ answer."""
+    session_id: str = Field(..., description="Active MCQ session ID")
+    question_id: str = Field(..., description="ID of the question being answered")
+    answer: str = Field(
+        ...,
+        description="User's answer: A, B, C, or D",
+        pattern="^[A-Da-d]$",
+    )
+
+
+class SubmitMCQResponse(BaseModel):
+    """Response after submitting an MCQ answer."""
+    session_id: str
+    question_id: str
+    user_answer: str
+    is_correct: bool
+    correct_answer: str
+    explanation: str
+    score: int = Field(description="10 if correct, 0 if incorrect")
+    next_question: Optional[MCQQuestion] = None
+    questions_answered: int
+    total_questions: int
+    session_complete: bool = False
+    total_score: int = Field(default=0, description="Running total score")
+    message: str
+
+
+class MCQSessionResponse(BaseModel):
+    """Full MCQ session details."""
+    session_id: str
+    user_id: str
+    interview_type: str
+    job_role: str
+    difficulty: str
+    status: str
+    total_questions: int
+    questions_answered: int
+    total_score: int
+    max_score: int
+    questions: List[MCQQuestion] = Field(default_factory=list)
+    answers: List[Dict[str, Any]] = Field(default_factory=list)
+    created_at: Optional[str] = None
+    completed_at: Optional[str] = None
+
+
+class SendResultsEmailRequest(BaseModel):
+    """Payload for sending interview results via email."""
+    session_id: str = Field(..., description="Interview session ID")
