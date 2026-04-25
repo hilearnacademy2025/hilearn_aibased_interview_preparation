@@ -267,6 +267,7 @@ from app.core.exceptions import register_exception_handlers
 from app.api.routes import health, interview, auth, admin
 from app.api.routes import payment
 from app.api.routes import leaderboard
+from app.api.routes import company
 
 # ─────────────────────────────────────────────────────────
 # Settings
@@ -358,6 +359,7 @@ async def lifespan(app: FastAPI):
     if mongo_connected:
         logger.info("✅ MongoDB connected")
         await db_service.create_indexes()
+        await db_service.create_company_indexes()
         logger.info("✅ MongoDB indexes verified")
     else:
         logger.warning(
@@ -426,6 +428,7 @@ AI-powered mock interview platform for Indian students and professionals.
         {"name": "Interview", "description": "Interview session management and AI feedback"},
         {"name": "Authentication", "description": "User signup, login, logout, and token management"},
         {"name": "Admin", "description": "Admin panel endpoints for platform management"},
+        {"name": "Company", "description": "Company registration, candidate discovery, and hiring"},
     ],
     lifespan=lifespan,
     docs_url="/docs",
@@ -463,6 +466,7 @@ app.include_router(auth.router, prefix="/api/v1")
 app.include_router(admin.router, prefix="/api/v1")
 app.include_router(payment.router, prefix="/api/v1")
 app.include_router(leaderboard.router, prefix="/api/v1")
+app.include_router(company.router, prefix="/api/v1")
 
 
 # ─────────────────────────────────────────────────────────

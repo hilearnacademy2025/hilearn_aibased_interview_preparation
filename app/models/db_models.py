@@ -342,3 +342,145 @@ class MCQQuestionDocument(BaseModel):
         if doc and "_id" in doc:
             doc["question_id"] = doc.pop("_id")
         return cls(**doc)
+
+
+# ─────────────────────────────────────────────────────────
+# Company Document  →  collection: "companies"
+# ─────────────────────────────────────────────────────────
+
+class CompanyDocument(BaseModel):
+    """
+    MongoDB document for a registered company account.
+
+    Stored in the ``companies`` collection.
+    The ``company_id`` field doubles as the MongoDB ``_id``.
+    """
+    company_id: str = Field(default_factory=lambda: str(uuid.uuid4()), description="Unique company identifier")
+    name: str = Field(..., description="Company display name")
+    email: str = Field(..., description="Company email (unique)")
+    password_hash: str = Field(..., description="Bcrypt-hashed password — NEVER expose via API")
+    industry: str = Field(default="", description="Industry sector")
+    size: str = Field(default="", description="Company size (e.g. 1-10, 11-50, 51-200, 201-500, 500+)")
+    website: str = Field(default="", description="Company website URL")
+    description: str = Field(default="", description="Company description")
+    logo_url: Optional[str] = Field(default=None, description="Company logo URL")
+    subscription_tier: str = Field(default="free", description="Subscription tier")
+    is_active: bool = Field(default=True, description="Whether company account is active")
+    verified_at: Optional[datetime] = Field(default=None, description="Email verification timestamp")
+    created_at: datetime = Field(default_factory=datetime.utcnow, description="Account creation timestamp")
+
+    @field_validator("email")
+    @classmethod
+    def normalise_email(cls, v: str) -> str:
+        return v.lower().strip()
+
+    def to_mongo(self) -> Dict[str, Any]:
+        data = self.model_dump()
+        data["_id"] = data.pop("company_id")
+        return data
+
+    @classmethod
+    def from_mongo(cls, doc: Dict[str, Any]) -> "CompanyDocument":
+        if doc and "_id" in doc:
+            doc["company_id"] = str(doc.pop("_id"))
+        return cls(**doc)
+
+
+# ─────────────────────────────────────────────────────────
+# Job Posting Document  →  collection: "job_postings"
+# ─────────────────────────────────────────────────────────
+
+class JobPostingDocument(BaseModel):
+    """
+    MongoDB document for a job posting created by a company.
+
+    Stored in the ``job_postings`` collection.
+    """
+    job_id: str = Field(default_factory=lambda: str(uuid.uuid4()), description="Unique job posting ID")
+    company_id: str = Field(..., description="Company that posted this job")
+    title: str = Field(..., description="Job title")
+    description: str = Field(default="", description="Job description")
+    required_role: str = Field(..., description="Required candidate role (backend, frontend, etc.)")
+    required_score: float = Field(default=0.0, ge=0.0, le=100.0, description="Minimum candidate score")
+    required_skills: List[str] = Field(default_factory=list, description="Required skills list")
+    experience_level: str = Field(default="mid", description="Required experience: junior, mid, senior")
+    salary_range: str = Field(default="", description="Salary range text")
+    location: str = Field(default="", description="Job location")
+    deadline: Optional[datetime] = Field(default=None, description="Application deadline")
+    is_active: bool = Field(default=True, description="Whether job is still open")
+    status: str = Field(default="open", description="Job status: open, closed, paused")
+    applications_count: int = Field(default=0, ge=0, description="Number of applications received")
+    created_at: datetime = Field(default_factory=datetime.utcnow, description="Job creation timestamp")
+
+    def to_mongo(self) -> Dict[str, Any]:
+        data = self.model_dump()
+        data["_id"] = data.pop("job_id")
+        return data
+
+    @classmethod
+    def from_mongo(cls, doc: Dict[str, Any]) -> "JobPostingDocument":
+        if doc and "_id" in doc:
+            doc["job_id"] = str(doc.pop("_id"))
+        return cls(**doc)
+
+
+# ─────────────────────────────────────────────────────────
+# Candidate Shortlist Document  →  collection: "candidate_shortlist"
+# ─────────────────────────────────────────────────────────
+
+class CandidateShortlistDocument(BaseModel):
+    """
+    MongoDB document for a shortlisted candidate entry.
+
+    Stored in the ``candidate_shortlist`` collection.
+    """
+    shortlist_id: str = Field(default_factory=lambda: str(uuid.uuid4()), description="Unique shortlist entry ID")
+    company_id: str = Field(..., description="Company that shortlisted")
+    user_id: str = Field(..., description="Shortlisted candidate user ID")
+    job_id: Optional[str] = Field(default=None, description="Associated job posting ID")
+    notes: str = Field(default="", description="Company notes about candidate")
+    shortlisted_at: datetime = Field(default_factory=datetime.utcnow, description="Shortlist timestamp")
+
+    def to_mongo(self) -> Dict[str, Any]:
+        data = self.model_dump()
+        data["_id"] = data.pop("shortlist_id")
+        return data
+
+    @classmethod
+    def from_mongo(cls, doc: Dict[str, Any]) -> "CandidateShortlistDocument":
+        if doc and "_id" in doc:
+            doc["shortlist_id"] = str(doc.pop("_id"))
+        return cls(**doc)
+
+
+# ─────────────────────────────────────────────────────────
+# Job Offer Document  →  collection: "job_offers"
+# ─────────────────────────────────────────────────────────
+
+class JobOfferDocument(BaseModel):
+    """
+    MongoDB document for a job offer sent by a company to a candidate.
+
+    Stored in the ``job_offers`` collection.
+    """
+    offer_id: str = Field(default_factory=lambda: str(uuid.uuid4()), description="Unique offer ID")
+    company_id: str = Field(..., description="Company sending the offer")
+    user_id: str = Field(..., description="Candidate receiving the offer")
+    job_id: str = Field(..., description="Associated job posting ID")
+    message: str = Field(default="", description="Offer message from company")
+    call_link: str = Field(default="", description="Interview/call link")
+    status: str = Field(default="pending", description="Offer status: pending, accepted, rejected")
+    created_at: datetime = Field(default_factory=datetime.utcnow, description="Offer creation timestamp")
+    responded_at: Optional[datetime] = Field(default=None, description="Candidate response timestamp")
+    response_message: str = Field(default="", description="Candidate response message")
+
+    def to_mongo(self) -> Dict[str, Any]:
+        data = self.model_dump()
+        data["_id"] = data.pop("offer_id")
+        return data
+
+    @classmethod
+    def from_mongo(cls, doc: Dict[str, Any]) -> "JobOfferDocument":
+        if doc and "_id" in doc:
+            doc["offer_id"] = str(doc.pop("_id"))
+        return cls(**doc)

@@ -11,6 +11,7 @@ const navLinks = [
   // { label: 'Dashboard', to: '/dashboard' },
   { label: 'Interview', to: '/interview' },
   { label: 'About', to: '/about' },
+  { label: 'Hire Talent', to: '/company/login' },
 ]
 
 function Header() {

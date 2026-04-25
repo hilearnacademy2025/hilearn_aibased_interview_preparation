@@ -69,6 +69,7 @@
 
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import api from '../utils/api'
+import { getCompanyProfile } from '../utils/api'
 
 const AuthContext = createContext(null)
 
@@ -76,6 +77,10 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [token, setToken] = useState(() => localStorage.getItem('hilearn_token'))
   const [loading, setLoading] = useState(true)
+
+  // ── Company auth state ───────────────────────────────────────────────────
+  const [companyUser, setCompanyUser] = useState(null)
+  const [companyToken, setCompanyToken] = useState(() => localStorage.getItem('hilearn_company_token'))
 
   // ── Token change hone par axios header update karo ──────────────────────
   useEffect(() => {
@@ -88,19 +93,41 @@ export function AuthProvider({ children }) {
     }
   }, [token])
 
+  // ── Company token persistence ───────────────────────────────────────────
+  useEffect(() => {
+    if (companyToken) {
+      localStorage.setItem('hilearn_company_token', companyToken)
+    } else {
+      localStorage.removeItem('hilearn_company_token')
+    }
+  }, [companyToken])
+
   // ── Mount par verify karo ────────────────────────────────────────────────
   useEffect(() => {
     const verify = async () => {
-      if (!token) { setLoading(false); return }
-      try {
-        const { data } = await api.get('/auth/me')
-        setUser(data)
-      } catch {
-        setToken(null)
-        setUser(null)
-      } finally {
-        setLoading(false)
+      // Verify student token
+      if (token) {
+        try {
+          const { data } = await api.get('/auth/me')
+          setUser(data)
+        } catch {
+          setToken(null)
+          setUser(null)
+        }
       }
+
+      // Verify company token
+      if (companyToken) {
+        try {
+          const data = await getCompanyProfile()
+          setCompanyUser(data)
+        } catch {
+          setCompanyToken(null)
+          setCompanyUser(null)
+        }
+      }
+
+      setLoading(false)
     }
     verify()
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
@@ -118,13 +145,31 @@ export function AuthProvider({ children }) {
     setUser(null)
   }, [])
 
+  // ── Company auth functions ──────────────────────────────────────────────
+  const companyLogin = useCallback(async (data) => {
+    setCompanyToken(data.token)
+    setCompanyUser({
+      company_id: data.company_id,
+      name: data.company_name,
+    })
+  }, [])
+
+  const companyLogout = useCallback(() => {
+    setCompanyToken(null)
+    setCompanyUser(null)
+  }, [])
+
   // ── role "student" hai backend me, "user" nahi ───────────────────────────
   const isAdmin         = user?.role === 'admin'
   const isUser          = user?.role === 'student'
   const isAuthenticated = !!token && !!user
+  const isCompany       = !!companyToken && !!companyUser
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, isAuthenticated, isAdmin, isUser, login, logout }}>
+    <AuthContext.Provider value={{
+      user, token, loading, isAuthenticated, isAdmin, isUser, login, logout,
+      companyUser, companyToken, isCompany, companyLogin, companyLogout,
+    }}>
       {children}
     </AuthContext.Provider>
   )

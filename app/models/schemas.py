@@ -432,3 +432,163 @@ class MCQSessionResponse(BaseModel):
 class SendResultsEmailRequest(BaseModel):
     """Payload for sending interview results via email."""
     session_id: str = Field(..., description="Interview session ID")
+
+
+# ─────────────────────────────────────────────────────────
+# Company Schemas
+# ─────────────────────────────────────────────────────────
+
+class CompanyRegisterRequest(BaseModel):
+    """Payload for company registration."""
+    company_name: str = Field(..., min_length=2, max_length=200, description="Company name")
+    email: str = Field(..., description="Company email address")
+    password: str = Field(..., min_length=8, max_length=128, description="Account password")
+    industry: str = Field(default="", description="Industry sector")
+    company_size: str = Field(default="", description="Company size range")
+    website: str = Field(default="", description="Company website URL")
+    description: str = Field(default="", max_length=2000, description="Company description")
+
+
+class CompanyLoginRequest(BaseModel):
+    """Payload for company login."""
+    email: str = Field(..., description="Company email address")
+    password: str = Field(..., description="Account password")
+
+
+class CompanyAuthResponse(BaseModel):
+    """Successful company authentication response."""
+    company_id: str = Field(..., description="Company unique identifier")
+    token: str = Field(..., description="JWT access token")
+    company_name: str = Field(..., description="Company name")
+    message: str = Field(default="Authentication successful")
+
+
+class CompanyProfileResponse(BaseModel):
+    """Company profile data."""
+    company_id: str
+    name: str
+    email: str
+    industry: str = ""
+    size: str = ""
+    website: str = ""
+    description: str = ""
+    logo_url: Optional[str] = None
+    subscription_tier: str = "free"
+    created_at: Optional[datetime] = None
+
+
+class CandidateSearchResponse(BaseModel):
+    """Single candidate in search results."""
+    user_id: str
+    name: str = ""
+    email: str = ""
+    phone: Optional[str] = None
+    target_role: str = ""
+    score: float = 0.0
+    interviews_completed: int = 0
+    skills: List[str] = Field(default_factory=list)
+    experience: str = ""
+
+
+class CandidateProfileResponse(BaseModel):
+    """Full candidate profile for company view."""
+    user_id: str
+    name: str = ""
+    email: str = ""
+    phone: Optional[str] = None
+    target_role: str = ""
+    skills: List[str] = Field(default_factory=list)
+    experience: str = ""
+    score: float = 0.0
+    interviews_completed: int = 0
+    interview_history: List[Dict[str, Any]] = Field(default_factory=list)
+    weak_areas: List[str] = Field(default_factory=list)
+    strong_areas: List[str] = Field(default_factory=list)
+    resume_url: Optional[str] = None
+    last_interview_at: Optional[datetime] = None
+
+
+class JobPostingRequest(BaseModel):
+    """Payload to create or update a job posting."""
+    job_title: str = Field(..., min_length=2, max_length=200, description="Job title")
+    job_description: str = Field(default="", max_length=5000)
+    required_role: str = Field(..., description="Required role: backend, frontend, devops, etc.")
+    required_score: float = Field(default=0.0, ge=0.0, le=100.0)
+    required_skills: List[str] = Field(default_factory=list)
+    experience_level: str = Field(default="mid", description="junior, mid, senior")
+    salary_range: str = Field(default="")
+    location: str = Field(default="")
+    deadline: Optional[str] = Field(default=None, description="ISO date string")
+
+
+class JobPostingResponse(BaseModel):
+    """Job posting response data."""
+    job_id: str
+    company_id: str
+    title: str
+    description: str = ""
+    required_role: str
+    required_score: float = 0.0
+    required_skills: List[str] = Field(default_factory=list)
+    experience_level: str = "mid"
+    salary_range: str = ""
+    location: str = ""
+    deadline: Optional[str] = None
+    status: str = "open"
+    is_active: bool = True
+    applications_count: int = 0
+    created_at: Optional[datetime] = None
+
+
+class ShortlistRequest(BaseModel):
+    """Payload to shortlist a candidate."""
+    job_id: Optional[str] = Field(default=None, description="Associated job posting ID")
+    notes: str = Field(default="", max_length=1000)
+
+
+class ShortlistResponse(BaseModel):
+    """Shortlist entry response."""
+    shortlist_id: str
+    company_id: str
+    user_id: str
+    job_id: Optional[str] = None
+    candidate_name: str = ""
+    job_title: str = ""
+    notes: str = ""
+    shortlisted_at: Optional[datetime] = None
+
+
+class OfferRequest(BaseModel):
+    """Payload to send a job offer."""
+    job_id: str = Field(..., description="Job posting ID")
+    message: str = Field(default="", max_length=2000)
+    call_link: str = Field(default="", description="Meeting/call link")
+
+
+class OfferResponse(BaseModel):
+    """Job offer response data."""
+    offer_id: str
+    company_id: str
+    user_id: str
+    job_id: str
+    company_name: str = ""
+    job_title: str = ""
+    message: str = ""
+    call_link: str = ""
+    status: str = "pending"
+    salary_range: str = ""
+    created_at: Optional[datetime] = None
+    responded_at: Optional[datetime] = None
+
+
+class MatchedCandidateResponse(BaseModel):
+    """Auto-matched candidate with score breakdown."""
+    rank: int
+    user_id: str
+    name: str = ""
+    match_score: float = 0.0
+    reason: str = ""
+    score: float = 0.0
+    skills: List[str] = Field(default_factory=list)
+    experience: str = ""
+    target_role: str = ""

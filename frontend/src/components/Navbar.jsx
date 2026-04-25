@@ -71,6 +71,9 @@ export default function Navbar({
           <Link to="/about" className="text-sm font-semibold text-slate-600 transition hover:text-slate-900">
             About
           </Link>
+          <Link to="/company/login" className="text-sm font-semibold text-blue-600 transition hover:text-blue-800">
+            Hire Talent
+          </Link>
         </nav>
 
         <div className="hidden items-center gap-3 lg:flex">
@@ -112,6 +115,13 @@ export default function Navbar({
               className="block rounded-xl px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
             >
               About
+            </Link>
+            <Link
+              to="/company/login"
+              onClick={() => setMobileMenuOpen(false)}
+              className="block rounded-xl px-4 py-3 text-sm font-semibold text-blue-600 transition hover:bg-blue-50"
+            >
+              For Companies
             </Link>
           </div>
 

@@ -177,3 +177,45 @@ async def get_current_user(
         )
 
     return payload
+
+
+# ─────────────────────────────────────────────────────────
+# Role-based Guards — Company vs Student
+# ─────────────────────────────────────────────────────────
+
+async def require_company(
+    user: Dict[str, Any] = Depends(get_current_user),
+) -> Dict[str, Any]:
+    """
+    FastAPI dependency that ensures the authenticated user is a company.
+
+    Checks JWT ``type`` claim == ``"company"``.
+    Returns 403 if the token does not belong to a company account.
+    """
+    token_type = user.get("type", "student")
+    if token_type != "company":
+        logger.warning("Access denied: require_company | type={}", token_type)
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This endpoint requires a company account.",
+        )
+    return user
+
+
+async def require_student(
+    user: Dict[str, Any] = Depends(get_current_user),
+) -> Dict[str, Any]:
+    """
+    FastAPI dependency that ensures the authenticated user is a student.
+
+    Checks JWT ``type`` claim == ``"student"`` (or missing for backward compat).
+    Returns 403 if the token belongs to a company account.
+    """
+    token_type = user.get("type", "student")
+    if token_type not in ("student", None):
+        logger.warning("Access denied: require_student | type={}", token_type)
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This endpoint requires a student account.",
+        )
+    return user

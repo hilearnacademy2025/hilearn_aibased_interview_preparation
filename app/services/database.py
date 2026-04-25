@@ -2009,6 +2009,676 @@ class DatabaseService:
             logger.error("[DB] update_leaderboard_stats failed | user_id={} | error={}", user_id, exc)
             return False
 
+    # ───────────────────────────────────────────────────────────────────────
+    # Company CRUD
+    # ───────────────────────────────────────────────────────────────────────
+
+    async def save_company(self, company_doc) -> Optional[str]:
+        """Insert a new company document."""
+        db = self._get_db()
+        if db is None:
+            return None
+        try:
+            doc = company_doc.to_mongo()
+            result = await db.companies.insert_one(doc)
+            logger.info("[DB] Company created | company_id={} | name={}", company_doc.company_id, company_doc.name)
+            return str(result.inserted_id)
+        except DuplicateKeyError:
+            logger.warning("[DB] Duplicate email on save_company | email={}", company_doc.email)
+            return None
+        except Exception as exc:
+            logger.error("[DB] save_company failed | error={}", exc)
+            return None
+
+    async def get_company_by_email(self, email: str):
+        """Find a company by email address."""
+        db = self._get_db()
+        if db is None:
+            return None
+        try:
+            import re as _re
+            clean_email = email.lower().strip()
+            doc = await db.companies.find_one({
+                "email": {"$regex": f"^{_re.escape(clean_email)}$", "$options": "i"}
+            })
+            if doc:
+                if "_id" in doc and not isinstance(doc["_id"], str):
+                    doc["_id"] = str(doc["_id"])
+                from app.models.db_models import CompanyDocument
+                return CompanyDocument.from_mongo(doc)
+            return None
+        except Exception as exc:
+            logger.error("[DB] get_company_by_email failed | email={} | error={}", email, exc)
+            return None
+
+    async def get_company_by_id(self, company_id: str):
+        """Find a company by ID."""
+        db = self._get_db()
+        if db is None:
+            return None
+        try:
+            doc = await db.companies.find_one({"_id": company_id})
+            if doc:
+                if "_id" in doc and not isinstance(doc["_id"], str):
+                    doc["_id"] = str(doc["_id"])
+                from app.models.db_models import CompanyDocument
+                return CompanyDocument.from_mongo(doc)
+            return None
+        except Exception as exc:
+            logger.error("[DB] get_company_by_id failed | company_id={} | error={}", company_id, exc)
+            return None
+
+    async def update_company(self, company_id: str, update_data: Dict[str, Any]) -> bool:
+        """Update company profile fields."""
+        db = self._get_db()
+        if db is None:
+            return False
+        try:
+            result = await db.companies.update_one(
+                {"_id": company_id},
+                {"$set": update_data},
+            )
+            return result.modified_count > 0
+        except Exception as exc:
+            logger.error("[DB] update_company failed | company_id={} | error={}", company_id, exc)
+            return False
+
+    # ───────────────────────────────────────────────────────────────────────
+    # Candidate Search & Profile
+    # ───────────────────────────────────────────────────────────────────────
+
+    async def get_candidates_for_search(
+        self,
+        role: Optional[str] = None,
+        min_score: float = 0,
+        max_score: float = 100,
+        skills: Optional[List[str]] = None,
+        experience: Optional[str] = None,
+        limit: int = 50,
+        skip: int = 0,
+    ) -> List[Dict[str, Any]]:
+        """Query candidates with filters, joining user + interview data."""
+        db = self._get_db()
+        if db is None:
+            return []
+        try:
+            # Build user query
+            user_query: Dict[str, Any] = {"role": "student"}
+            # Only show candidates who opted in (or field doesn't exist)
+            user_query["$or"] = [
+                {"show_to_companies": True},
+                {"show_to_companies": {"$exists": False}},
+            ]
+            if role:
+                user_query["target_role"] = {"$regex": role, "$options": "i"}
+            if experience:
+                user_query["experience_level"] = experience
+
+            cursor = db.users.find(user_query).skip(skip).limit(limit)
+            candidates = []
+
+            async for user_doc in cursor:
+                user_id = str(user_doc.get("_id", ""))
+
+                # Get interview stats via aggregation
+                pipeline = [
+                    {"$match": {"user_id": user_id, "status": "completed"}},
+                    {"$addFields": {
+                        "_answer_scores": {
+                            "$map": {
+                                "input": {"$ifNull": ["$answers", []]},
+                                "as": "a",
+                                "in": {"$ifNull": [{"$toDouble": "$$a.content_score"}, 0]}
+                            }
+                        }
+                    }},
+                    {"$addFields": {
+                        "_interview_score": {
+                            "$cond": {
+                                "if": {"$gt": [{"$size": "$_answer_scores"}, 0]},
+                                "then": {"$avg": "$_answer_scores"},
+                                "else": 0
+                            }
+                        }
+                    }},
+                    {"$group": {
+                        "_id": "$user_id",
+                        "avg_score": {"$avg": "$_interview_score"},
+                        "interviews_completed": {"$sum": 1},
+                        "job_roles": {"$addToSet": "$job_role"},
+                    }},
+                ]
+                stats = {"avg_score": 0, "interviews_completed": 0}
+                async for doc in db.interviews.aggregate(pipeline):
+                    stats = doc
+
+                # Normalize score to 0-100
+                avg_score = round(stats.get("avg_score", 0) * 10, 1)  # 0-10 -> 0-100
+
+                # Apply score filter
+                if avg_score < min_score or avg_score > max_score:
+                    continue
+
+                user_skills = user_doc.get("skills", []) or user_doc.get("tech_stack", []) or []
+
+                # Apply skills filter
+                if skills:
+                    candidate_skills_lower = [s.lower() for s in user_skills]
+                    if not any(s.lower() in candidate_skills_lower for s in skills):
+                        continue
+
+                candidates.append({
+                    "user_id": user_id,
+                    "name": user_doc.get("name", ""),
+                    "email": user_doc.get("email", ""),
+                    "phone": user_doc.get("phone", None),
+                    "target_role": user_doc.get("target_role", ""),
+                    "score": avg_score,
+                    "interviews_completed": stats.get("interviews_completed", 0),
+                    "skills": user_skills,
+                    "experience": user_doc.get("experience_level", ""),
+                })
+
+            return candidates
+        except Exception as exc:
+            logger.error("[DB] get_candidates_for_search failed | error={}", exc)
+            return []
+
+    async def get_candidate_profile(self, user_id: str) -> Optional[Dict[str, Any]]:
+        """Get full candidate profile with interview history."""
+        db = self._get_db()
+        if db is None:
+            return None
+        try:
+            from bson import ObjectId
+            query = {"_id": user_id}
+            if len(user_id) == 24:
+                try:
+                    query = {"$or": [{"_id": user_id}, {"_id": ObjectId(user_id)}]}
+                except Exception:
+                    pass
+            user_doc = await db.users.find_one(query)
+            if not user_doc:
+                return None
+
+            # Get interview history
+            interview_cursor = db.interviews.find(
+                {"user_id": user_id, "status": "completed"}
+            ).sort("created_at", DESCENDING).limit(20)
+
+            interview_history = []
+            all_scores = []
+            weak_areas = set()
+            strong_areas = set()
+
+            async for interview in interview_cursor:
+                answers = interview.get("answers", [])
+                scores = [float(a.get("content_score", 0)) for a in answers if a.get("content_score") is not None]
+                avg = round(sum(scores) / len(scores), 1) if scores else 0
+                all_scores.append(avg)
+
+                # Identify weak/strong based on individual answer scores
+                for a in answers:
+                    score = float(a.get("content_score", 0)) if a.get("content_score") else 0
+                    feedback = a.get("feedback", "")
+                    if score < 5:
+                        weak_areas.add(interview.get("job_role", "General"))
+                    elif score >= 7:
+                        strong_areas.add(interview.get("job_role", "General"))
+
+                interview_history.append({
+                    "session_id": str(interview.get("_id", "")),
+                    "job_role": interview.get("job_role", ""),
+                    "interview_type": interview.get("interview_type", ""),
+                    "score": avg * 10,  # Normalize to 0-100
+                    "questions_count": len(interview.get("questions", [])),
+                    "date": str(interview.get("created_at", "")),
+                })
+
+            overall_score = round((sum(all_scores) / len(all_scores)) * 10, 1) if all_scores else 0
+
+            # Get analytics for weak areas
+            analytics = await db.analytics.find_one({"_id": user_id})
+            if analytics:
+                weak_areas.update(analytics.get("weak_areas", []))
+
+            return {
+                "user_id": user_id,
+                "name": user_doc.get("name", ""),
+                "email": user_doc.get("email", ""),
+                "phone": user_doc.get("phone", None),
+                "target_role": user_doc.get("target_role", ""),
+                "skills": user_doc.get("skills", []) or user_doc.get("tech_stack", []) or [],
+                "experience": user_doc.get("experience_level", ""),
+                "score": overall_score,
+                "interviews_completed": len(interview_history),
+                "interview_history": interview_history,
+                "weak_areas": list(weak_areas),
+                "strong_areas": list(strong_areas),
+                "resume_url": user_doc.get("resume_url", None),
+                "last_interview_at": interview_history[0]["date"] if interview_history else None,
+            }
+        except Exception as exc:
+            logger.error("[DB] get_candidate_profile failed | user_id={} | error={}", user_id, exc)
+            return None
+
+    # ───────────────────────────────────────────────────────────────────────
+    # Shortlist CRUD
+    # ───────────────────────────────────────────────────────────────────────
+
+    async def shortlist_candidate(self, shortlist_doc) -> Optional[str]:
+        """Add candidate to company shortlist."""
+        db = self._get_db()
+        if db is None:
+            return None
+        try:
+            doc = shortlist_doc.to_mongo()
+            result = await db.candidate_shortlist.insert_one(doc)
+            logger.info("[DB] Candidate shortlisted | company={} | user={}", shortlist_doc.company_id, shortlist_doc.user_id)
+            return str(result.inserted_id)
+        except Exception as exc:
+            logger.error("[DB] shortlist_candidate failed | error={}", exc)
+            return None
+
+    async def get_shortlisted_candidates(self, company_id: str) -> List[Dict[str, Any]]:
+        """Get all shortlisted candidates for a company with user & job details."""
+        db = self._get_db()
+        if db is None:
+            return []
+        try:
+            cursor = db.candidate_shortlist.find({"company_id": company_id}).sort("shortlisted_at", DESCENDING)
+            results = []
+            async for doc in cursor:
+                # Enrich with user name
+                u_id = doc.get("user_id")
+                try:
+                    from bson import ObjectId
+                    if isinstance(u_id, str) and len(u_id) == 24:
+                        u_query = {"$or": [{"_id": u_id}, {"_id": ObjectId(u_id)}]}
+                    else:
+                        u_query = {"_id": u_id}
+                except Exception:
+                    u_query = {"_id": u_id}
+                user = await db.users.find_one(u_query, {"name": 1})
+                # Enrich with job title
+                job_title = ""
+                if doc.get("job_id"):
+                    job = await db.job_postings.find_one({"_id": doc["job_id"]}, {"title": 1})
+                    job_title = job.get("title", "") if job else ""
+
+                results.append({
+                    "shortlist_id": str(doc.get("_id", "")),
+                    "company_id": doc.get("company_id", ""),
+                    "user_id": doc.get("user_id", ""),
+                    "job_id": doc.get("job_id", ""),
+                    "candidate_name": user.get("name", "") if user else "",
+                    "job_title": job_title,
+                    "notes": doc.get("notes", ""),
+                    "shortlisted_at": doc.get("shortlisted_at"),
+                })
+            return results
+        except Exception as exc:
+            logger.error("[DB] get_shortlisted_candidates failed | error={}", exc)
+            return []
+
+    async def remove_shortlist(self, company_id: str, user_id: str) -> bool:
+        """Remove candidate from company shortlist."""
+        db = self._get_db()
+        if db is None:
+            return False
+        try:
+            result = await db.candidate_shortlist.delete_one({"company_id": company_id, "user_id": user_id})
+            return result.deleted_count > 0
+        except Exception as exc:
+            logger.error("[DB] remove_shortlist failed | error={}", exc)
+            return False
+
+    async def update_shortlist_notes(self, company_id: str, user_id: str, notes: str) -> bool:
+        """Update notes on a shortlist entry."""
+        db = self._get_db()
+        if db is None:
+            return False
+        try:
+            result = await db.candidate_shortlist.update_one(
+                {"company_id": company_id, "user_id": user_id},
+                {"$set": {"notes": notes}},
+            )
+            return result.modified_count > 0
+        except Exception as exc:
+            logger.error("[DB] update_shortlist_notes failed | error={}", exc)
+            return False
+
+    # ───────────────────────────────────────────────────────────────────────
+    # Job Postings CRUD
+    # ───────────────────────────────────────────────────────────────────────
+
+    async def save_job(self, job_doc) -> Optional[str]:
+        """Insert a new job posting."""
+        db = self._get_db()
+        if db is None:
+            return None
+        try:
+            doc = job_doc.to_mongo()
+            result = await db.job_postings.insert_one(doc)
+            logger.info("[DB] Job posting created | job_id={} | company={}", job_doc.job_id, job_doc.company_id)
+            return str(result.inserted_id)
+        except Exception as exc:
+            logger.error("[DB] save_job failed | error={}", exc)
+            return None
+
+    async def get_company_jobs(self, company_id: str) -> List[Dict[str, Any]]:
+        """List all jobs posted by a company."""
+        db = self._get_db()
+        if db is None:
+            return []
+        try:
+            cursor = db.job_postings.find({"company_id": company_id}).sort("created_at", DESCENDING)
+            results = []
+            async for doc in cursor:
+                results.append({
+                    "job_id": str(doc.get("_id", "")),
+                    "company_id": doc.get("company_id", ""),
+                    "title": doc.get("title", ""),
+                    "description": doc.get("description", ""),
+                    "required_role": doc.get("required_role", ""),
+                    "required_score": doc.get("required_score", 0),
+                    "required_skills": doc.get("required_skills", []),
+                    "experience_level": doc.get("experience_level", "mid"),
+                    "salary_range": doc.get("salary_range", ""),
+                    "location": doc.get("location", ""),
+                    "deadline": str(doc.get("deadline", "")) if doc.get("deadline") else None,
+                    "status": doc.get("status", "open"),
+                    "is_active": doc.get("is_active", True),
+                    "applications_count": doc.get("applications_count", 0),
+                    "created_at": doc.get("created_at"),
+                })
+            return results
+        except Exception as exc:
+            logger.error("[DB] get_company_jobs failed | error={}", exc)
+            return []
+
+    async def get_job_by_id(self, job_id: str) -> Optional[Dict[str, Any]]:
+        """Get a single job posting by ID."""
+        db = self._get_db()
+        if db is None:
+            return None
+        try:
+            doc = await db.job_postings.find_one({"_id": job_id})
+            if doc:
+                doc["job_id"] = str(doc.pop("_id"))
+                return doc
+            return None
+        except Exception as exc:
+            logger.error("[DB] get_job_by_id failed | error={}", exc)
+            return None
+
+    async def update_job(self, job_id: str, data: Dict[str, Any]) -> bool:
+        """Update job posting fields."""
+        db = self._get_db()
+        if db is None:
+            return False
+        try:
+            result = await db.job_postings.update_one({"_id": job_id}, {"$set": data})
+            return result.modified_count > 0
+        except Exception as exc:
+            logger.error("[DB] update_job failed | error={}", exc)
+            return False
+
+    async def delete_job(self, job_id: str) -> bool:
+        """Delete/close a job posting."""
+        db = self._get_db()
+        if db is None:
+            return False
+        try:
+            result = await db.job_postings.update_one(
+                {"_id": job_id},
+                {"$set": {"is_active": False, "status": "closed"}},
+            )
+            return result.modified_count > 0
+        except Exception as exc:
+            logger.error("[DB] delete_job failed | error={}", exc)
+            return False
+
+    # ───────────────────────────────────────────────────────────────────────
+    # Candidate Matching Algorithm
+    # ───────────────────────────────────────────────────────────────────────
+
+    async def get_matched_candidates(self, job_id: str) -> List[Dict[str, Any]]:
+        """
+        Auto-match candidates against a job posting using scoring algorithm:
+        - Role match:       40 points (exact match)
+        - Score match:      30 points (proportional)
+        - Skills match:     20 points (proportional)
+        - Experience match: 10 points (exact=10, adjacent=5)
+        """
+        db = self._get_db()
+        if db is None:
+            return []
+        try:
+            job = await db.job_postings.find_one({"_id": job_id})
+            if not job:
+                return []
+
+            required_role = (job.get("required_role", "") or "").lower()
+            required_score = job.get("required_score", 0) or 1
+            required_skills = [s.lower() for s in (job.get("required_skills", []) or [])]
+            required_experience = (job.get("experience_level", "mid") or "mid").lower()
+
+            # Adjacent experience levels
+            adjacent_map = {
+                "junior": ["mid"],
+                "mid": ["junior", "senior"],
+                "senior": ["mid"],
+            }
+
+            # Get all visible candidates
+            candidates = await self.get_candidates_for_search(limit=200)
+            matched = []
+
+            for c in candidates:
+                # Role match (40 points)
+                candidate_role = (c.get("target_role", "") or "").lower()
+                role_points = 40 if candidate_role and required_role and required_role in candidate_role else 0
+
+                # Score match (30 points)
+                candidate_score = c.get("score", 0) or 0
+                if required_score > 0:
+                    score_points = min(candidate_score / required_score, 1.0) * 30
+                else:
+                    score_points = 30
+
+                # Skills match (20 points)
+                candidate_skills = [s.lower() for s in (c.get("skills", []) or [])]
+                if required_skills:
+                    matching = sum(1 for s in required_skills if s in candidate_skills)
+                    skills_points = (matching / len(required_skills)) * 20
+                else:
+                    skills_points = 20
+
+                # Experience match (10 points)
+                candidate_exp = (c.get("experience", "") or "").lower()
+                if candidate_exp == required_experience:
+                    exp_points = 10
+                elif candidate_exp in adjacent_map.get(required_experience, []):
+                    exp_points = 5
+                else:
+                    exp_points = 0
+
+                total_score = round(role_points + score_points + skills_points + exp_points, 1)
+
+                # Build reason string
+                reasons = []
+                if role_points == 40:
+                    reasons.append("Role match")
+                if candidate_score >= required_score:
+                    reasons.append(f"Score {candidate_score}")
+                matched_skills = [s for s in required_skills if s in candidate_skills]
+                if matched_skills:
+                    reasons.append(f"Skills: {', '.join(matched_skills[:3])}")
+                if exp_points >= 5:
+                    reasons.append(f"{candidate_exp} level")
+
+                matched.append({
+                    "user_id": c["user_id"],
+                    "name": c.get("name", ""),
+                    "match_score": total_score,
+                    "reason": ", ".join(reasons) if reasons else "Partial match",
+                    "score": candidate_score,
+                    "skills": c.get("skills", []),
+                    "experience": c.get("experience", ""),
+                    "target_role": c.get("target_role", ""),
+                })
+
+            # Sort by match_score descending
+            matched.sort(key=lambda x: x["match_score"], reverse=True)
+
+            # Assign ranks
+            for i, m in enumerate(matched):
+                m["rank"] = i + 1
+
+            return matched
+        except Exception as exc:
+            logger.error("[DB] get_matched_candidates failed | error={}", exc)
+            return []
+
+    # ───────────────────────────────────────────────────────────────────────
+    # Job Offers
+    # ───────────────────────────────────────────────────────────────────────
+
+    async def save_offer(self, offer_doc) -> Optional[str]:
+        """Insert a new job offer."""
+        db = self._get_db()
+        if db is None:
+            return None
+        try:
+            doc = offer_doc.to_mongo()
+            result = await db.job_offers.insert_one(doc)
+            logger.info("[DB] Offer sent | offer_id={} | company={} | user={}",
+                        offer_doc.offer_id, offer_doc.company_id, offer_doc.user_id)
+            return str(result.inserted_id)
+        except Exception as exc:
+            logger.error("[DB] save_offer failed | error={}", exc)
+            return None
+
+    async def get_candidate_offers(self, user_id: str) -> List[Dict[str, Any]]:
+        """Get all offers received by a candidate."""
+        db = self._get_db()
+        if db is None:
+            return []
+        try:
+            cursor = db.job_offers.find({"user_id": user_id}).sort("created_at", DESCENDING)
+            results = []
+            async for doc in cursor:
+                # Enrich with company name
+                company = await db.companies.find_one({"_id": doc.get("company_id")}, {"name": 1})
+                # Enrich with job details
+                job = await db.job_postings.find_one({"_id": doc.get("job_id")}, {"title": 1, "salary_range": 1})
+
+                results.append({
+                    "offer_id": str(doc.get("_id", "")),
+                    "company_id": doc.get("company_id", ""),
+                    "user_id": doc.get("user_id", ""),
+                    "job_id": doc.get("job_id", ""),
+                    "company_name": company.get("name", "") if company else "",
+                    "job_title": job.get("title", "") if job else "",
+                    "salary_range": job.get("salary_range", "") if job else "",
+                    "message": doc.get("message", ""),
+                    "call_link": doc.get("call_link", ""),
+                    "status": doc.get("status", "pending"),
+                    "created_at": doc.get("created_at"),
+                    "responded_at": doc.get("responded_at"),
+                })
+            return results
+        except Exception as exc:
+            logger.error("[DB] get_candidate_offers failed | error={}", exc)
+            return []
+
+    async def get_company_responses(self, company_id: str) -> List[Dict[str, Any]]:
+        """Get all offer responses for a company."""
+        db = self._get_db()
+        if db is None:
+            return []
+        try:
+            cursor = db.job_offers.find({"company_id": company_id}).sort("created_at", DESCENDING)
+            results = []
+            async for doc in cursor:
+                u_id = doc.get("user_id")
+                try:
+                    from bson import ObjectId
+                    if isinstance(u_id, str) and len(u_id) == 24:
+                        u_query = {"$or": [{"_id": u_id}, {"_id": ObjectId(u_id)}]}
+                    else:
+                        u_query = {"_id": u_id}
+                except Exception:
+                    u_query = {"_id": u_id}
+                user = await db.users.find_one(u_query, {"name": 1})
+                job = await db.job_postings.find_one({"_id": doc.get("job_id")}, {"title": 1})
+
+                results.append({
+                    "offer_id": str(doc.get("_id", "")),
+                    "candidate_name": user.get("name", "") if user else "",
+                    "job_title": job.get("title", "") if job else "",
+                    "status": doc.get("status", "pending"),
+                    "created_at": doc.get("created_at"),
+                    "responded_at": doc.get("responded_at"),
+                })
+            return results
+        except Exception as exc:
+            logger.error("[DB] get_company_responses failed | error={}", exc)
+            return []
+
+    async def update_offer_status(self, offer_id: str, status: str, response_message: str = "") -> bool:
+        """Update offer status (accept/reject)."""
+        db = self._get_db()
+        if db is None:
+            return False
+        try:
+            result = await db.job_offers.update_one(
+                {"_id": offer_id},
+                {"$set": {
+                    "status": status,
+                    "responded_at": datetime.utcnow(),
+                    "response_message": response_message,
+                }},
+            )
+            return result.modified_count > 0
+        except Exception as exc:
+            logger.error("[DB] update_offer_status failed | error={}", exc)
+            return False
+
+    async def create_company_indexes(self) -> None:
+        """Create indexes for company-related collections."""
+        db = self._get_db()
+        if db is None:
+            return
+        try:
+            # Companies
+            await db.companies.create_indexes([
+                IndexModel([("email", ASCENDING)], unique=True, name="idx_companies_email_unique"),
+                IndexModel([("created_at", DESCENDING)], name="idx_companies_created_at"),
+            ])
+            # Job Postings
+            await db.job_postings.create_indexes([
+                IndexModel([("company_id", ASCENDING)], name="idx_jobs_company"),
+                IndexModel([("required_role", ASCENDING)], name="idx_jobs_role"),
+                IndexModel([("created_at", DESCENDING)], name="idx_jobs_created_at"),
+            ])
+            # Candidate Shortlist
+            await db.candidate_shortlist.create_indexes([
+                IndexModel([("company_id", ASCENDING)], name="idx_shortlist_company"),
+                IndexModel([("user_id", ASCENDING)], name="idx_shortlist_user"),
+                IndexModel([("company_id", ASCENDING), ("user_id", ASCENDING)], name="idx_shortlist_compound"),
+            ])
+            # Job Offers
+            await db.job_offers.create_indexes([
+                IndexModel([("user_id", ASCENDING)], name="idx_offers_user"),
+                IndexModel([("company_id", ASCENDING)], name="idx_offers_company"),
+                IndexModel([("status", ASCENDING)], name="idx_offers_status"),
+            ])
+            logger.success("[DB] Company-related indexes created successfully")
+        except Exception as exc:
+            logger.error("[DB] create_company_indexes failed | error={}", exc)
+
 
 # ── Module-level service singleton ─────────────────────────────────────────
 db_service = DatabaseService()
