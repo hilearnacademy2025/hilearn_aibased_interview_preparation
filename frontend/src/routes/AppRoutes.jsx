@@ -51,6 +51,7 @@ import JobPostings from '../pages/company/JobPostings'
 import JobPostForm from '../pages/company/JobPostForm'
 import MatchedCandidates from '../pages/company/MatchedCandidates'
 import CompanyResponses from '../pages/company/CompanyResponses'
+import HireTalent from '../pages/company/HireTalent'
 
 // Smooth fade - no jhatka
 const pageVariants = {
@@ -192,6 +193,7 @@ export default function AppRoutes() {
           {/* Public company auth pages — no guard */}
           <Route path="/company/register" element={<CompanyRegister />} />
           <Route path="/company/login" element={<CompanyLogin />} />
+          <Route path="/company/hire" element={<HireTalent />} />
 
           {/* Protected company dashboard — requires company auth */}
           <Route path="/company" element={<RequireCompany><CompanyLayout /></RequireCompany>}>
