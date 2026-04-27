@@ -1,9 +1,8 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@700;800&display=swap');
 @import "tailwindcss";
 
 :root {
   color-scheme: light;
-  font-family: 'DM Sans', 'Segoe UI', sans-serif;
+  font-family: 'DM Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol';
   --bg: #f4f2ee;
   --surface: #ffffff;
   --surface-soft: #fcfaf7;
@@ -80,7 +79,7 @@ select {
 }
 
 .display-font {
-  font-family: 'Playfair Display', serif;
+  font-family: 'Playfair Display', Georgia, Cambria, "Times New Roman", Times, serif;
 }
 
 .body-font {

@@ -832,6 +832,8 @@ async def list_users(
                 "created_at": str(doc.get("created_at", "")),
                 "is_active": doc.get("status", "active") != "deleted",
                 "status": doc.get("status", "active"),
+                "suspended_at": str(doc.get("suspended_at", "")) if doc.get("suspended_at") else None,
+                "suspension_reason": doc.get("suspension_reason", ""),
             })
 
         return APIResponse(
@@ -987,6 +989,109 @@ async def update_user(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to update user.",
         )
+
+
+# ─────────────────────────────────────────────────────────
+# 4a. PATCH /admin/users/{user_id}/suspend
+# ─────────────────────────────────────────────────────────
+from app.models.schemas import SuspendUserRequest
+
+@router.patch(
+    "/users/{user_id}/suspend",
+    response_model=APIResponse,
+    summary="Suspend User",
+    description="Suspend a user account.",
+)
+async def suspend_user(
+    user_id: str,
+    payload: SuspendUserRequest,
+    admin: Dict[str, Any] = Depends(require_admin),
+) -> APIResponse:
+    """Set user status to suspended."""
+    logger.info("[ADMIN] PATCH /admin/users/{}/suspend | admin={}", user_id, admin.get("sub"))
+
+    try:
+        user_doc = await db.users.find_one({"_id": user_id})
+        if not user_doc:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"User '{user_id}' not found.")
+        
+        if user_doc.get("status") == "suspended":
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User is already suspended.")
+
+        update_data = {
+            "status": "suspended",
+            "suspended_at": datetime.utcnow(),
+            "suspension_reason": payload.reason or "",
+            "updated_at": datetime.utcnow()
+        }
+
+        await db.users.update_one({"_id": user_id}, {"$set": update_data})
+
+        return APIResponse(
+            message="User suspended successfully",
+            data={
+                "user_id": user_id,
+                "email": user_doc.get("email"),
+                "status": "suspended",
+                "suspended_at": str(update_data["suspended_at"]),
+                "suspension_reason": update_data["suspension_reason"]
+            }
+        )
+
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error("[ADMIN] Suspend user failed | user_id={} | error={}", user_id, exc)
+        raise HTTPException(status_code=500, detail="Failed to suspend user.")
+
+
+# ─────────────────────────────────────────────────────────
+# 4b. PATCH /admin/users/{user_id}/activate
+# ─────────────────────────────────────────────────────────
+@router.patch(
+    "/users/{user_id}/activate",
+    response_model=APIResponse,
+    summary="Activate User",
+    description="Reactivate a suspended user account.",
+)
+async def activate_user(
+    user_id: str,
+    admin: Dict[str, Any] = Depends(require_admin),
+) -> APIResponse:
+    """Set user status to active."""
+    logger.info("[ADMIN] PATCH /admin/users/{}/activate | admin={}", user_id, admin.get("sub"))
+
+    try:
+        user_doc = await db.users.find_one({"_id": user_id})
+        if not user_doc:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"User '{user_id}' not found.")
+        
+        if user_doc.get("status") == "active":
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User is already active.")
+
+        update_data = {
+            "status": "active",
+            "suspended_at": None,
+            "suspension_reason": None,
+            "updated_at": datetime.utcnow()
+        }
+
+        await db.users.update_one({"_id": user_id}, {"$set": update_data})
+
+        return APIResponse(
+            message="User activated successfully",
+            data={
+                "user_id": user_id,
+                "email": user_doc.get("email"),
+                "status": "active"
+            }
+        )
+
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error("[ADMIN] Activate user failed | user_id={} | error={}", user_id, exc)
+        raise HTTPException(status_code=500, detail="Failed to activate user.")
 
 
 # ─────────────────────────────────────────────────────────

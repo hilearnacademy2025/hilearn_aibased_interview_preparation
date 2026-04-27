@@ -181,6 +181,72 @@ async def update_company_profile(
     success = await db_service.update_company(company_id, safe_updates)
     return {"success": success, "message": "Profile updated." if success else "No changes made."}
 
+# ─────────────────────────────────────────────────────────
+# Company Settings
+# ─────────────────────────────────────────────────────────
+
+@router.get("/settings")
+async def get_company_settings(user: Dict[str, Any] = Depends(require_company)):
+    """Get company settings details."""
+    company_id = user.get("sub")
+    company = await db_service.get_company_by_id(company_id)
+    if not company:
+        raise HTTPException(status_code=404, detail="Company not found.")
+
+    return {
+        "company_id": company.company_id,
+        "name": company.name,
+        "email": company.email,
+        "industry": company.industry,
+        "size": company.size,
+        "website": company.website,
+        "description": company.description,
+        "created_at": str(company.created_at) if company.created_at else None,
+    }
+
+
+from app.models.schemas import UpdateCompanyProfileRequest
+
+@router.patch("/settings/profile")
+async def update_company_settings_profile(
+    payload: UpdateCompanyProfileRequest,
+    user: Dict[str, Any] = Depends(require_company),
+):
+    """Update company profile settings."""
+    company_id = user.get("sub")
+    
+    update_data = {k: v for k, v in payload.model_dump().items() if v is not None}
+    if not update_data:
+        raise HTTPException(status_code=400, detail="No valid fields to update.")
+        
+    update_data["updated_at"] = datetime.utcnow()
+    success = await db_service.update_company(company_id, update_data)
+    
+    return {"success": success, "message": "Profile updated successfully." if success else "Failed to update profile."}
+
+
+from app.models.schemas import ChangePasswordRequest
+
+@router.post("/settings/change-password")
+async def change_company_password(
+    payload: ChangePasswordRequest,
+    user: Dict[str, Any] = Depends(require_company),
+):
+    """Change company password."""
+    company_id = user.get("sub")
+    company = await db_service.get_company_by_id(company_id)
+    
+    if not company:
+        raise HTTPException(status_code=404, detail="Company not found.")
+        
+    if not verify_password(payload.current_password, company.password_hash):
+        raise HTTPException(status_code=400, detail="Incorrect current password.")
+        
+    hashed = hash_password(payload.new_password)
+    success = await db_service.update_company(company_id, {"password_hash": hashed, "updated_at": datetime.utcnow()})
+    
+    return {"success": success, "message": "Password changed successfully." if success else "Failed to change password."}
+
 
 # ─────────────────────────────────────────────────────────
 # Candidate Discovery

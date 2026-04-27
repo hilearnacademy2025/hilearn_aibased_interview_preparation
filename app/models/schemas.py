@@ -572,13 +572,19 @@ class OfferResponse(BaseModel):
     user_id: str
     job_id: str
     company_name: str = ""
+    candidate_name: str = ""
     job_title: str = ""
     message: str = ""
     call_link: str = ""
     status: str = "pending"
     salary_range: str = ""
+    response_message: str = ""
     created_at: Optional[datetime] = None
     responded_at: Optional[datetime] = None
+
+class SuspendUserRequest(BaseModel):
+    """Payload to suspend a user."""
+    reason: Optional[str] = Field(default=None, description="Reason for suspension")
 
 
 class MatchedCandidateResponse(BaseModel):
@@ -592,3 +598,18 @@ class MatchedCandidateResponse(BaseModel):
     skills: List[str] = Field(default_factory=list)
     experience: str = ""
     target_role: str = ""
+
+
+class UpdateCompanyProfileRequest(BaseModel):
+    """Payload to update company settings."""
+    name: Optional[str] = Field(default=None, description="Company name")
+    industry: Optional[str] = Field(default=None, description="Industry sector")
+    size: Optional[str] = Field(default=None, description="Company size range")
+    website: Optional[str] = Field(default=None, description="Company website URL")
+    description: Optional[str] = Field(default=None, description="Company description")
+
+
+class ChangePasswordRequest(BaseModel):
+    """Payload to change company password."""
+    current_password: str = Field(..., description="Current password")
+    new_password: str = Field(..., description="New password")

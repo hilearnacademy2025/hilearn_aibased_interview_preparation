@@ -152,8 +152,8 @@
 
 import { motion, AnimatePresence } from 'framer-motion'
 import { useState, useEffect } from 'react'
-import { Search, Loader2, UserPlus, X, Eye, EyeOff, Trash2, AlertTriangle } from 'lucide-react'
-import { getAdminUsers, deleteAdminUser } from '../../utils/api'
+import { Search, Loader2, UserPlus, X, Eye, EyeOff, Trash2, AlertTriangle, ShieldAlert, ShieldCheck } from 'lucide-react'
+import { getAdminUsers, deleteAdminUser, suspendAdminUser, activateAdminUser } from '../../utils/api'
 import api from '../../utils/api'
 
 // ── Add User Modal ────────────────────────────────────────────────────────────
@@ -346,6 +346,31 @@ export default function AdminUsers() {
   const [showAddModal, setShowAddModal] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState(null) // user to delete
 
+  const handleSuspend = async (user) => {
+    const reason = window.prompt(`Enter reason to suspend ${user.name}:`);
+    if (reason === null) return;
+    setLoading(true);
+    try {
+      await suspendAdminUser(user._id || user.user_id, reason);
+      fetchUsers(page, search);
+    } catch (err) {
+      alert(err.message || 'Failed to suspend user');
+      setLoading(false);
+    }
+  }
+
+  const handleActivate = async (user) => {
+    if (!window.confirm(`Reactivate ${user.name}?`)) return;
+    setLoading(true);
+    try {
+      await activateAdminUser(user._id || user.user_id);
+      fetchUsers(page, search);
+    } catch (err) {
+      alert(err.message || 'Failed to activate user');
+      setLoading(false);
+    }
+  }
+
   const fetchUsers = async (p = 1, s = '') => {
     setLoading(true)
     try {
@@ -448,20 +473,50 @@ export default function AdminUsers() {
                       <span className="text-sm text-[#9c9a96]">{u.created_at ? u.created_at.split('T')[0] : ''}</span>
                     </td>
                     <td className="px-6 py-4">
-                      <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${u.is_active !== false ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'}`}>
-                        {u.is_active !== false ? 'Active' : 'Inactive'}
-                      </span>
+                      {u.status === 'suspended' ? (
+                        <div className="group/tooltip relative inline-block">
+                          <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-red-50 text-red-600 cursor-help">
+                            Suspended
+                          </span>
+                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-gray-900 text-white text-xs rounded opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible transition-all z-10">
+                            <p className="font-semibold mb-1">Suspended at: {u.suspended_at ? u.suspended_at.split(' ')[0] : 'N/A'}</p>
+                            <p>{u.suspension_reason || 'No reason provided'}</p>
+                          </div>
+                        </div>
+                      ) : (
+                        <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${u.is_active !== false ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
+                          {u.is_active !== false ? 'Active' : 'Inactive'}
+                        </span>
+                      )}
                     </td>
-                    {/* REMOVE BUTTON */}
+                    {/* ACTIONS BUTTONS */}
                     <td className="px-6 py-4">
-                      <button
-                        onClick={() => setDeleteTarget(u)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-red-500 border border-red-100 bg-red-50 hover:bg-red-100 hover:border-red-200 transition opacity-0 group-hover:opacity-100"
-                        title="Remove user"
-                      >
-                        <Trash2 size={13} />
-                        Remove
-                      </button>
+                      <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        {u.status === 'suspended' ? (
+                          <button
+                            onClick={() => handleActivate(u)}
+                            className="flex items-center justify-center p-2 rounded-lg text-green-600 border border-green-200 bg-green-50 hover:bg-green-100 transition"
+                            title="Activate User"
+                          >
+                            <ShieldCheck size={16} />
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handleSuspend(u)}
+                            className="flex items-center justify-center p-2 rounded-lg text-orange-600 border border-orange-200 bg-orange-50 hover:bg-orange-100 transition"
+                            title="Suspend User"
+                          >
+                            <ShieldAlert size={16} />
+                          </button>
+                        )}
+                        <button
+                          onClick={() => setDeleteTarget(u)}
+                          className="flex items-center justify-center p-2 rounded-lg text-red-600 border border-red-200 bg-red-50 hover:bg-red-100 transition"
+                          title="Permanently Remove"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
                     </td>
                   </motion.tr>
                 ))}

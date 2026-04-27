@@ -3,7 +3,7 @@ import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import {
   LayoutDashboard, Search, Star, Briefcase, Users, Send,
-  Menu, X, ChevronRight, Building2, LogOut, Zap
+  Menu, X, ChevronRight, Building2, LogOut, Zap, Settings
 } from 'lucide-react'
 
 const companyNavItems = [
@@ -16,6 +16,7 @@ const companyNavItems = [
       { icon: Briefcase, label: 'Job Postings', href: '/company/jobs' },
       { icon: Users, label: 'Matched', href: '/company/matched' },
       { icon: Send, label: 'Responses', href: '/company/responses' },
+      { icon: Settings, label: 'Settings', href: '/company/settings' },
     ],
   },
 ]

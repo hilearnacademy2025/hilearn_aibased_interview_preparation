@@ -621,13 +621,14 @@ _email_index: dict = {}   # { email   -> user_id  }
 # ─────────────────────────────────────────────────────────
 # FIX 2: UserInDB was never defined/imported — adding it here
 class UserInDB:
-    def __init__(self, user_id, email, name, role, hashed_password, created_at):
+    def __init__(self, user_id, email, name, role, hashed_password, created_at, status="active"):
         self.user_id = user_id
         self.email = email
         self.name = name
         self.role = role
         self.hashed_password = hashed_password
         self.created_at = created_at
+        self.status = status
 
 
 # ─────────────────────────────────────────────────────────
@@ -864,6 +865,13 @@ class AuthService:
                 headers={"WWW-Authenticate": "Bearer"},
             )
 
+        if user.status == "suspended":
+            logger.warning("[LOGIN] Account suspended | email={}", email)
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Your account has been suspended. Please contact support.",
+            )
+
         user_id = user.user_id
         role = user.role if isinstance(user.role, str) else user.role.value
         name = user.name
@@ -1075,9 +1083,10 @@ class AuthService:
                     user_id=user_doc.user_id,
                     email=user_doc.email,
                     name=user_doc.name,
-                    role=user_doc.role.value,
+                    role=user_doc.role.value if hasattr(user_doc.role, "value") else user_doc.role,
                     hashed_password=user_doc.password_hash,
                     created_at=user_doc.created_at,
+                    status=user_doc.status.value if hasattr(user_doc.status, "value") else user_doc.status,
                 )
                 _user_store[user.user_id] = user
                 _email_index[user.email] = user.user_id
@@ -1109,9 +1118,10 @@ class AuthService:
                     user_id=user_doc.user_id,
                     email=user_doc.email,
                     name=user_doc.name,
-                    role=user_doc.role.value,
+                    role=user_doc.role.value if hasattr(user_doc.role, "value") else user_doc.role,
                     hashed_password=user_doc.password_hash,
                     created_at=user_doc.created_at,
+                    status=user_doc.status.value if hasattr(user_doc.status, "value") else user_doc.status,
                 )
                 _user_store[user.user_id] = user
                 _email_index[user.email] = user.user_id

@@ -132,6 +132,16 @@ export const updateAdminUser = async (userId, payload) => {
   return data
 }
 
+export const suspendAdminUser = async (userId, reason) => {
+  const { data } = await api.patch(`/admin/users/${userId}/suspend`, { reason })
+  return data
+}
+
+export const activateAdminUser = async (userId) => {
+  const { data } = await api.patch(`/admin/users/${userId}/activate`)
+  return data
+}
+
 export const deleteAdminUser = async (userId) => {
   const { data } = await api.delete(`/admin/users/${userId}`)
   return data

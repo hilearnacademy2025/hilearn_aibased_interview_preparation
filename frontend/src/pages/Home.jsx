@@ -88,9 +88,9 @@ function Home() {
               <Button to="/interview" className="px-7 py-4 text-base">
                 Start practicing
               </Button>
-              <Button to="/dashboard" variant="secondary" className="px-7 py-4 text-base">
+              {/* <Button to="/dashboard" variant="secondary" className="px-7 py-4 text-base">
                 View dashboard
-              </Button>
+              </Button> */}
             </motion.div>
             <motion.div variants={fadeUp} className="flex flex-wrap gap-3">
               {['Warm light theme', 'Live AI rounds', 'Feedback you can act on'].map((pill) => (

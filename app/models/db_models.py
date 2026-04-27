@@ -32,6 +32,13 @@ class UserRole(str, Enum):
     ADMIN = "admin"
 
 
+class UserStatus(str, Enum):
+    """User account status."""
+    ACTIVE = "active"
+    SUSPENDED = "suspended"
+    DELETED = "deleted"
+
+
 class InterviewType(str, Enum):
     """Type of interview session."""
     TECHNICAL = "technical"
@@ -71,8 +78,11 @@ class UserDocument(BaseModel):
     password_hash: str = Field(..., description="Bcrypt-hashed password — NEVER expose via API")
     name: str = Field(..., description="User's display name")
     role: UserRole = Field(default=UserRole.STUDENT, description="User role")
+    status: UserStatus = Field(default=UserStatus.ACTIVE, description="Account status")
     phone: Optional[str] = Field(default=None, description="Phone number (optional)")
     bio: Optional[str] = Field(default=None, description="Short bio (optional)")
+    suspended_at: Optional[datetime] = Field(default=None, description="When the account was suspended")
+    suspension_reason: Optional[str] = Field(default=None, description="Reason for suspension")
     created_at: datetime = Field(default_factory=datetime.utcnow, description="Account creation timestamp")
     updated_at: datetime = Field(default_factory=datetime.utcnow, description="Last profile update timestamp")
     interview_count: int = Field(default=0, ge=0, description="Total interviews taken")
@@ -88,6 +98,8 @@ class UserDocument(BaseModel):
         """Convert to a MongoDB-friendly dict with ``_id`` set to ``user_id``."""
         data = self.model_dump()
         data["_id"] = data.pop("user_id")
+        data["status"] = data["status"].value if isinstance(data.get("status"), UserStatus) else data.get("status")
+        data["role"] = data["role"].value if isinstance(data.get("role"), UserRole) else data.get("role")
         return data
 
     @classmethod
