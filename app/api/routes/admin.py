@@ -1502,3 +1502,83 @@ async def admin_create_user(
     except Exception as exc:
         logger.error("[ADMIN] Create user failed | error={}", exc)
         raise HTTPException(status_code=500, detail="User create nahi ho saka.")
+
+
+# ─────────────────────────────────────────────────────────
+# GET /admin/real-analytics — Enhanced Analytics
+# ─────────────────────────────────────────────────────────
+@router.get(
+    "/real-analytics",
+    response_model=APIResponse,
+    summary="Real Platform Analytics",
+    description="Real-time analytics: DAU, popular roles, session duration, daily trends, platform stats.",
+)
+async def real_analytics(
+    admin: Dict[str, Any] = Depends(require_admin),
+) -> APIResponse:
+    """Return comprehensive real-time analytics data for the admin dashboard."""
+    logger.info("[ADMIN] GET /admin/real-analytics | admin={}", admin.get("sub"))
+
+    try:
+        from app.services.database import db_service
+
+        daily_active_users = await db_service.get_daily_active_users(days=7)
+        popular_roles = await db_service.get_popular_job_roles(days=30)
+        avg_session_duration = await db_service.get_average_session_duration()
+        new_users_today = await db_service.get_new_users_today()
+        daily_interviews = await db_service.get_daily_interview_count(days=7)
+        platform_stats = await db_service.get_platform_statistics()
+
+        return APIResponse(
+            message="Real analytics retrieved",
+            data={
+                "daily_active_users": daily_active_users,
+                "popular_roles": popular_roles,
+                "avg_session_duration": avg_session_duration,
+                "new_users_today": new_users_today,
+                "daily_interviews": daily_interviews,
+                "platform_stats": platform_stats,
+            },
+        )
+
+    except Exception as exc:
+        logger.error("[ADMIN] Real analytics query failed | error={}", exc)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to fetch real analytics data.",
+        )
+
+
+# ─────────────────────────────────────────────────────────
+# POST /admin/notifications/send-reminders
+# ─────────────────────────────────────────────────────────
+@router.post(
+    "/notifications/send-reminders",
+    response_model=APIResponse,
+    summary="Manually Trigger Reminder Emails",
+    description="Admin-only: manually trigger practice reminder emails for inactive users.",
+)
+async def send_reminders(
+    admin: Dict[str, Any] = Depends(require_admin),
+) -> APIResponse:
+    """Manually trigger reminder emails for inactive users."""
+    logger.info("[ADMIN] POST /admin/notifications/send-reminders | admin={}", admin.get("sub"))
+
+    try:
+        from app.tasks.scheduled_tasks import check_inactive_users
+
+        result = await check_inactive_users()
+        return APIResponse(
+            message=result.get("message", "Reminders processed"),
+            data={
+                "emails_sent": result.get("sent", 0),
+                "errors": result.get("errors", 0),
+            },
+        )
+
+    except Exception as exc:
+        logger.error("[ADMIN] Send reminders failed | error={}", exc)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to send reminder emails.",
+        )

@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
-import { Mic, MicOff, Loader, ChevronRight, CheckCircle2, XCircle, Volume2 } from 'lucide-react'
+import { Mic, MicOff, Loader, ChevronRight, CheckCircle2, XCircle, Volume2, Clock } from 'lucide-react'
 import { submitMCQ } from '../../utils/api'
+import useQuestionTimer from '../../hooks/useQuestionTimer'
 
 export default function UserMCQInterview() {
   const navigate = useNavigate()
@@ -19,6 +20,17 @@ export default function UserMCQInterview() {
   const [voiceMode, setVoiceMode] = useState(false)
   const [listening, setListening] = useState(false)
   const [voiceText, setVoiceText] = useState('')
+
+  // The custom hook for 2-minute countdown
+  const { formattedTime, isWarning } = useQuestionTimer(questionNum, () => {
+    if (!submitting && !feedback) {
+      // Auto-submit logic when time is up
+      if (!selectedAnswer) {
+        setSelectedAnswer('Z') // Dummy answer to force submission and get wrong mark
+      }
+      handleSubmit()
+    }
+  })
 
   // Load session from localStorage
   useEffect(() => {
@@ -220,8 +232,14 @@ export default function UserMCQInterview() {
               Question {questionNum} of {totalQuestions}
             </h1>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="text-right">
+          <div className="flex items-center gap-4">
+            <div className={`flex flex-col items-end transition ${isWarning ? 'text-rose-600 animate-pulse font-bold' : 'text-[#0f1f3d]'}`}>
+              <div className="flex items-center gap-1.5 text-sm font-mono">
+                <Clock size={14} className={isWarning ? 'text-rose-600' : 'text-[#c8601a]'} />
+                {formattedTime}
+              </div>
+            </div>
+            <div className="text-right border-l-2 border-[#e0dbd3] pl-4">
               <p className="text-xs text-[#9c9a96]">Score</p>
               <p className="text-lg font-bold text-[#c8601a]">{totalScore}</p>
             </div>

@@ -139,6 +139,7 @@ import { Link } from 'react-router-dom'
 import { Mic, BarChart3, Award, Zap, ArrowUpRight, ChevronRight, BookOpen, Loader } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { getUserSessions } from '../../utils/api'
+import OnboardingWizard from '../../components/OnboardingWizard'
 
 const tips = [
   { title: 'System Design Mastery',       level: 'Advanced',     progress: 60 },
@@ -172,6 +173,9 @@ export default function UserDashboard() {
   const { user } = useAuth()
   const [sessions, setSessions] = useState([])
   const [loadingSessions, setLoadingSessions] = useState(true)
+  const [showOnboarding, setShowOnboarding] = useState(() => {
+    try { return localStorage.getItem('hasCompletedOnboarding') !== 'true' } catch { return false }
+  })
 
   const firstName = user?.name?.split(' ')[0] || 'there'
   const hour = new Date().getHours()
@@ -200,6 +204,11 @@ export default function UserDashboard() {
 
   return (
     <div className="space-y-8">
+      {/* Onboarding Wizard — shown on first login */}
+      {showOnboarding && (
+        <OnboardingWizard onComplete={() => setShowOnboarding(false)} />
+      )}
+
       {/* Header */}
       <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>

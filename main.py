@@ -269,6 +269,15 @@ from app.api.routes import payment
 from app.api.routes import leaderboard
 from app.api.routes import company
 
+# Scheduled Tasks
+try:
+    from apscheduler.schedulers.asyncio import AsyncIOScheduler
+    from app.tasks.scheduled_tasks import check_inactive_users
+    _scheduler_available = True
+except ImportError:
+    _scheduler_available = False
+    logger.warning("APScheduler not installed — scheduled tasks disabled")
+
 # ─────────────────────────────────────────────────────────
 # Settings
 # ─────────────────────────────────────────────────────────
@@ -367,12 +376,36 @@ async def lifespan(app: FastAPI):
             "Data will NOT persist across restarts."
         )
 
+    # ── Scheduled Tasks ──────────────────────────────────────────────────
+    scheduler = None
+    if _scheduler_available:
+        try:
+            scheduler = AsyncIOScheduler()
+            scheduler.add_job(
+                check_inactive_users,
+                'cron',
+                hour=9,
+                minute=0,
+                id='check_inactive_users',
+                name='Daily Practice Reminder Emails',
+                replace_existing=True,
+            )
+            scheduler.start()
+            logger.info("✅ APScheduler started — daily reminders at 09:00")
+        except Exception as sched_exc:
+            logger.warning("⚠️  Scheduler setup failed: {}", sched_exc)
+
     logger.info("✅ HiLearn backend started successfully!")
 
     yield   # ← app is running
 
     # ── SHUTDOWN ─────────────────────────────────────────
     logger.info("🛑 Shutting down HiLearn backend...")
+
+    # Shutdown scheduler
+    if scheduler and scheduler.running:
+        scheduler.shutdown(wait=False)
+        logger.info("✅ Scheduler stopped")
 
     # Day 5: Close MongoDB connection
     await db_service.disconnect()

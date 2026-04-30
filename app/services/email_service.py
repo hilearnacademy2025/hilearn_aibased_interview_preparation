@@ -397,6 +397,110 @@ class EmailService:
             logger.error("[EMAIL] SMTP send failed | to={} | error={}", to_email, exc)
             return False
 
+    async def send_practice_reminder(self, user_id: str, days_since_last_interview: int = 3) -> Dict[str, Any]:
+        """
+        Send a practice reminder email to an inactive user.
+
+        Args:
+            user_id: The user's unique identifier.
+            days_since_last_interview: Number of days since last practice.
+
+        Returns:
+            Dict with success status and message.
+        """
+        try:
+            from app.services.database import db_service
+
+            if not db_service.is_connected:
+                return {"success": False, "message": "Database not connected"}
+
+            user_doc = await db_service.get_user_by_id(user_id)
+            if not user_doc or not user_doc.email:
+                return {"success": False, "message": "User email not found"}
+
+            user_name = user_doc.name or "Student"
+            user_email = user_doc.email
+
+            html = f"""
+            <!DOCTYPE html>
+            <html>
+            <head><meta charset="utf-8"></head>
+            <body style="margin:0;padding:0;background:#f4f2ee;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+                <div style="max-width:640px;margin:0 auto;padding:32px 16px;">
+
+                    <!-- Header -->
+                    <div style="background:linear-gradient(135deg,#0f1f3d 0%,#1a3a6b 100%);border-radius:20px;padding:32px;text-align:center;margin-bottom:24px;">
+                        <h1 style="color:white;font-size:28px;margin:0;">👋 We miss you, {user_name}!</h1>
+                        <p style="color:rgba(255,255,255,0.7);font-size:14px;margin-top:8px;">
+                            You haven't practiced in {days_since_last_interview} days
+                        </p>
+                    </div>
+
+                    <!-- Content -->
+                    <div style="background:white;border-radius:16px;padding:32px;margin-bottom:24px;box-shadow:0 4px 24px rgba(0,0,0,0.06);">
+                        <p style="font-size:16px;color:#0f1f3d;font-weight:600;margin:0 0 12px;">
+                            Come back and ace your next interview! 🎯
+                        </p>
+                        <p style="font-size:14px;color:#5c5a57;line-height:1.6;margin:0 0 20px;">
+                            Consistent practice is key to interview success. Your last session was
+                            <strong>{days_since_last_interview} days ago</strong>. Even a quick 10-minute
+                            mock interview can sharpen your skills significantly.
+                        </p>
+
+                        <div style="padding:16px;background:#f9f7f4;border-radius:12px;border:1px solid #f0ede9;margin-bottom:20px;">
+                            <p style="font-size:13px;color:#5c5a57;margin:0;line-height:1.6;">
+                                💡 <strong>Quick tip:</strong> Students who practice at least 3 times per week
+                                score 40% higher in real interviews.
+                            </p>
+                        </div>
+
+                        <a href="https://hilearn.in/user/interview-setup"
+                           style="display:inline-block;padding:14px 32px;background:linear-gradient(135deg,#c8601a,#e07030);color:white;border-radius:50px;text-decoration:none;font-weight:700;font-size:15px;box-shadow:0 6px 20px rgba(200,96,26,0.35);">
+                            🎤 Start a Mock Interview
+                        </a>
+                    </div>
+
+                    <!-- Stats reminder -->
+                    <div style="background:white;border-radius:16px;padding:24px;margin-bottom:24px;box-shadow:0 4px 24px rgba(0,0,0,0.06);">
+                        <h3 style="color:#0f1f3d;font-size:16px;margin:0 0 12px;">What you can practice:</h3>
+                        <ul style="margin:0;padding-left:20px;font-size:14px;color:#5c5a57;">
+                            <li style="padding:4px 0;">Technical interviews (DSA, System Design)</li>
+                            <li style="padding:4px 0;">Behavioral interviews (STAR method)</li>
+                            <li style="padding:4px 0;">HR rounds (Salary negotiation, Culture fit)</li>
+                            <li style="padding:4px 0;">MCQ quizzes with instant feedback</li>
+                        </ul>
+                    </div>
+
+                    <!-- Footer -->
+                    <div style="text-align:center;padding:24px;color:#9c9a96;font-size:12px;">
+                        <p>Sent by HiLearn AI Interview Prep</p>
+                        <p style="margin-top:4px;">© {datetime.now().year} HiLearn Academy. All rights reserved.</p>
+                        <p style="margin-top:8px;">
+                            <a href="https://hilearn.in/user/settings" style="color:#9c9a96;">Unsubscribe</a>
+                        </p>
+                    </div>
+                </div>
+            </body>
+            </html>
+            """
+
+            subject = f"🎯 {user_name}, it's been {days_since_last_interview} days! Time to practice"
+            sent = self._send_smtp_email(
+                to_email=user_email,
+                subject=subject,
+                html_body=html,
+            )
+
+            if sent:
+                logger.success("[EMAIL] Practice reminder sent | user_id={} | to={}", user_id, user_email)
+                return {"success": True, "message": f"Reminder sent to {user_email}"}
+            else:
+                return {"success": False, "message": "Failed to send reminder email"}
+
+        except Exception as exc:
+            logger.error("[EMAIL] send_practice_reminder failed | user_id={} | error={}", user_id, exc)
+            return {"success": False, "message": f"Reminder failed: {str(exc)}"}
+
 
 # ── Module-level service singleton ─────────────────────────────────────────
 email_service = EmailService()

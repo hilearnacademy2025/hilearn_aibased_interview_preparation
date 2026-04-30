@@ -181,8 +181,9 @@ import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import {
   LayoutDashboard, Users, BarChart3, Settings,
-  LogOut, Menu, X, ChevronRight, Bell, Shield, Brain, Trophy
+  LogOut, Menu, X, ChevronRight, Bell, Shield, Brain, Trophy, Sun, Moon
 } from 'lucide-react'
+import useDarkMode from '../hooks/useDarkMode'
 
 const adminNavItems = [
   {
@@ -391,6 +392,8 @@ function AdminSidebar({ open, onClose }) {
 }
 
 function AdminTopBar({ onMenuClick }) {
+  const { isDarkMode, toggleDarkMode } = useDarkMode()
+
   return (
     <header style={{
       height: '64px', background: 'rgba(255,255,255,0.95)',
@@ -414,6 +417,16 @@ function AdminTopBar({ onMenuClick }) {
         </div>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <button
+          onClick={toggleDarkMode}
+          style={{
+            padding: '8px', borderRadius: '10px',
+            border: 'none', background: 'transparent', cursor: 'pointer',
+          }}
+          title="Toggle Dark Mode"
+        >
+          {isDarkMode ? <Sun size={18} color="#f59e0b" /> : <Moon size={18} color="#6b7280" />}
+        </button>
         <button style={{
           position: 'relative', padding: '8px', borderRadius: '10px',
           border: 'none', background: 'transparent', cursor: 'pointer',
