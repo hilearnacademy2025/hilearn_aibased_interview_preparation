@@ -21,6 +21,7 @@ import PricingPage from '../pages/Pricing'
 import Checkout from '../pages/Checkout'
 import Interview from '../pages/Interview'
 import Signup from '../pages/Signup'
+import ShareResult from '../pages/ShareResult'
 
 import AdminDashboard from '../pages/admin/AdminDashboard'
 import AdminUsers from '../pages/admin/AdminUsers'
@@ -106,6 +107,7 @@ function PublicContent() {
     <AnimatePresence mode="wait">
       <Routes location={location} key={location.pathname}>
         <Route path="/" element={<PageWrap><Home /></PageWrap>} />
+        <Route path="/share/:interviewId" element={<PageWrap><ShareResult /></PageWrap>} />
         <Route path="/features" element={<PageWrap><Features /></PageWrap>} />
         <Route path="/about" element={<PageWrap><About /></PageWrap>} />
         <Route path="/pricing" element={<PageWrap><PricingPage /></PageWrap>} />

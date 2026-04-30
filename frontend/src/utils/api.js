@@ -511,6 +511,24 @@ export const getAdminAnalytics = async () => {
   return data
 }
 
+// ── Real Analytics API (Enhanced) ──────────────────────────────────────────
+export const getAdminRealAnalytics = async () => {
+  const { data } = await api.get('/admin/real-analytics')
+  return data
+}
+
+// ── Notification API ───────────────────────────────────────────────────────
+export const triggerSendReminders = async () => {
+  const { data } = await api.post('/admin/notifications/send-reminders')
+  return data
+}
+
+// ── Share Link Generator ───────────────────────────────────────────────────
+export const generateShareLink = (sessionId) => {
+  const baseUrl = window.location.origin
+  return `${baseUrl}/share/${sessionId}`
+}
+
 // export default api
 // ── Payment APIs ───────────────────────────────────────────────────────────────
 export const getPlans = async () => {

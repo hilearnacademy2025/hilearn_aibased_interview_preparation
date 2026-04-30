@@ -447,9 +447,10 @@ import { Link } from 'react-router-dom';
 import {
   CheckCircle, TrendingUp, Mic, ArrowRight,
   BookOpen, ExternalLink, ChevronDown, ChevronUp,
-  Star, Zap, MessageSquare, BarChart3, Award, Clock, Mail, Loader
+  Star, Zap, MessageSquare, BarChart3, Award, Clock, Mail, Loader, Share2, Copy
 } from 'lucide-react';
-import { sendResultsEmail } from '../../utils/api';
+import { sendResultsEmail, generateShareLink } from '../../utils/api';
+import useScoreCelebration from '../../hooks/useScoreCelebration';
 
 const LMS_URL = 'https://hilearn-lms-tool.vercel.app/courses';
 
@@ -536,6 +537,8 @@ export default function UserFeedback() {
   const [sendingEmail, setSendingEmail] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
   const [emailError, setEmailError] = useState('');
+  const [showShareOptions, setShowShareOptions] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
 
   const raw = JSON.parse(localStorage.getItem('hilearn_complete_feedback') || 'null');
   const latest = JSON.parse(localStorage.getItem('hilearn_latest_feedback') || 'null');
@@ -558,6 +561,17 @@ export default function UserFeedback() {
   const hasData = score > 0;
   const rec = getLMSRec(score, improv, jobRole);
   const hasRealData = hasData && !!sessionId;
+
+  // Trigger score celebration (confetti) if score >= 8
+  useScoreCelebration(score);
+
+  const handleCopyLink = () => {
+    if (!sessionId) return;
+    const link = generateShareLink(sessionId);
+    navigator.clipboard.writeText(link);
+    setCopiedLink(true);
+    setTimeout(() => setCopiedLink(false), 2000);
+  };
 
   const handleSendEmail = async () => {
     if (!sessionId) {
@@ -830,6 +844,49 @@ export default function UserFeedback() {
         >
           Dashboard
         </Link>
+        
+        {hasRealData && (
+          <div className="relative">
+            <button
+              onClick={() => setShowShareOptions(!showShareOptions)}
+              className="flex items-center justify-center gap-2 px-6 py-4 border-2 border-[#c8601a] text-[#c8601a] rounded-full font-bold hover:bg-[#c8601a]/10 transition"
+            >
+              <Share2 size={16} /> Share Result
+            </button>
+            
+            <AnimatePresence>
+              {showShareOptions && (
+                <motion.div 
+                  initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }}
+                  className="absolute bottom-full left-0 mb-2 w-64 bg-white rounded-2xl shadow-xl border border-[#e0dbd3] p-2 z-50 flex flex-col gap-1"
+                >
+                  <button 
+                    onClick={handleCopyLink}
+                    className="flex items-center gap-3 w-full p-3 hover:bg-[#f9f7f4] rounded-xl transition text-left text-sm font-semibold text-[#0f1f3d]"
+                  >
+                    {copiedLink ? <CheckCircle size={16} className="text-green-500" /> : <Copy size={16} className="text-[#5c5a57]" />}
+                    {copiedLink ? 'Link Copied!' : 'Copy Share Link'}
+                  </button>
+                  <a 
+                    href={`https://twitter.com/intent/tweet?text=I just scored ${score}/10 on my ${jobRole} mock interview at HiLearn! Check it out: ${generateShareLink(sessionId)}`}
+                    target="_blank" rel="noopener noreferrer"
+                    className="flex items-center gap-3 w-full p-3 hover:bg-[#f9f7f4] rounded-xl transition text-left text-sm font-semibold text-[#1DA1F2]"
+                  >
+                    <Share2 size={16} /> Share on Twitter
+                  </a>
+                  <a 
+                    href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(generateShareLink(sessionId))}`}
+                    target="_blank" rel="noopener noreferrer"
+                    className="flex items-center gap-3 w-full p-3 hover:bg-[#f9f7f4] rounded-xl transition text-left text-sm font-semibold text-[#0A66C2]"
+                  >
+                    <Share2 size={16} /> Share on LinkedIn
+                  </a>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        )}
+
         <a href={LMS_URL} target="_blank" rel="noopener noreferrer"
           className="flex items-center gap-2 px-5 py-3.5 rounded-full font-semibold text-sm border-2 transition hover:opacity-80"
           style={{ borderColor: rec.accent + '60', color: rec.accent }}

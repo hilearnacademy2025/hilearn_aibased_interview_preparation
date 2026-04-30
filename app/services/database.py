@@ -1903,6 +1903,140 @@ class DatabaseService:
         except Exception as exc:
             logger.error("[DB] create_company_indexes failed | error={}", exc)
 
+    # ───────────────────────────────────────────────────────────────────────
+    # Real Analytics Methods (Feature Enhancement)
+    # ───────────────────────────────────────────────────────────────────────
+
+    async def get_daily_active_users(self, days: int = 7) -> int:
+        """Count unique users who interviewed in the last N days."""
+        db = self._get_db()
+        if db is None:
+            return 0
+        try:
+            cutoff = datetime.utcnow() - timedelta(days=days)
+            pipeline = [
+                {"$match": {"created_at": {"$gte": cutoff}}},
+                {"$group": {"_id": "$user_id"}},
+                {"$count": "total"},
+            ]
+            async for result in db.interviews.aggregate(pipeline):
+                return result.get("total", 0)
+            return 0
+        except Exception as exc:
+            logger.error("[DB] get_daily_active_users failed | error={}", exc)
+            return 0
+
+    async def get_popular_job_roles(self, days: int = 30) -> List[Dict[str, Any]]:
+        """Return the most popular job roles selected in interviews."""
+        db = self._get_db()
+        if db is None:
+            return []
+        try:
+            cutoff = datetime.utcnow() - timedelta(days=days)
+            pipeline = [
+                {"$match": {"created_at": {"$gte": cutoff}, "job_role": {"$exists": True, "$ne": ""}}},
+                {"$group": {"_id": "$job_role", "count": {"$sum": 1}}},
+                {"$sort": {"count": -1}},
+                {"$limit": 10},
+            ]
+            results = []
+            async for doc in db.interviews.aggregate(pipeline):
+                results.append({"role": doc["_id"], "count": doc["count"]})
+            return results
+        except Exception as exc:
+            logger.error("[DB] get_popular_job_roles failed | error={}", exc)
+            return []
+
+    async def get_average_session_duration(self) -> float:
+        """Return average interview duration in minutes."""
+        db = self._get_db()
+        if db is None:
+            return 0.0
+        try:
+            pipeline = [
+                {"$match": {"status": "completed", "completed_at": {"$exists": True}}},
+                {
+                    "$addFields": {
+                        "duration_mins": {
+                            "$divide": [
+                                {"$subtract": ["$completed_at", "$created_at"]},
+                                60000,  # ms to minutes
+                            ]
+                        }
+                    }
+                },
+                {"$match": {"duration_mins": {"$gt": 0, "$lt": 120}}},
+                {"$group": {"_id": None, "avg_duration": {"$avg": "$duration_mins"}}},
+            ]
+            async for result in db.interviews.aggregate(pipeline):
+                return round(result.get("avg_duration", 0.0), 1)
+            return 0.0
+        except Exception as exc:
+            logger.error("[DB] get_average_session_duration failed | error={}", exc)
+            return 0.0
+
+    async def get_new_users_today(self) -> int:
+        """Count users registered today."""
+        db = self._get_db()
+        if db is None:
+            return 0
+        try:
+            today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+            return await db.users.count_documents({"created_at": {"$gte": today_start}})
+        except Exception as exc:
+            logger.error("[DB] get_new_users_today failed | error={}", exc)
+            return 0
+
+    async def get_daily_interview_count(self, days: int = 7) -> List[Dict[str, Any]]:
+        """Return daily interview counts for last N days."""
+        db = self._get_db()
+        if db is None:
+            return []
+        try:
+            today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+            results = []
+            for i in range(days - 1, -1, -1):
+                day_start = today - timedelta(days=i)
+                day_end = day_start + timedelta(days=1)
+                count = await db.interviews.count_documents({
+                    "created_at": {"$gte": day_start, "$lt": day_end}
+                })
+                results.append({
+                    "date": day_start.strftime("%Y-%m-%d"),
+                    "count": count,
+                })
+            return results
+        except Exception as exc:
+            logger.error("[DB] get_daily_interview_count failed | error={}", exc)
+            return []
+
+    async def get_platform_statistics(self) -> Dict[str, Any]:
+        """Return overall platform metrics."""
+        db = self._get_db()
+        if db is None:
+            return {"total_users": 0, "total_interviews": 0, "avg_score": 0.0}
+        try:
+            total_users = await db.users.count_documents({})
+            total_interviews = await db.interviews.count_documents({})
+
+            # Average score across all users with interviews
+            avg_score = 0.0
+            pipeline = [
+                {"$match": {"interview_count": {"$gt": 0}}},
+                {"$group": {"_id": None, "avg": {"$avg": "$average_score"}}},
+            ]
+            async for result in db.users.aggregate(pipeline):
+                avg_score = round(result.get("avg", 0.0), 1)
+
+            return {
+                "total_users": total_users,
+                "total_interviews": total_interviews,
+                "avg_score": avg_score,
+            }
+        except Exception as exc:
+            logger.error("[DB] get_platform_statistics failed | error={}", exc)
+            return {"total_users": 0, "total_interviews": 0, "avg_score": 0.0}
+
 
 # ── Module-level service singleton ─────────────────────────────────────────
-db_service = DatabaseService()
+db_service = DatabaseService()

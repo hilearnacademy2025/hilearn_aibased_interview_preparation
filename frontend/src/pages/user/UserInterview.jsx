@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom'
 import { Send, Mic, MicOff, Clock, Loader } from 'lucide-react'
 import { submitAnswer, transcribeAudio } from '../../utils/api'
 import { useToast } from '../../components/common/ToastProvider'
+import useQuestionTimer from '../../hooks/useQuestionTimer'
 
 export default function UserInterview() {
   const navigate = useNavigate()
@@ -40,9 +41,20 @@ export default function UserInterview() {
   const [useBackendSTT, setUseBackendSTT] = useState(true)  // prefer backend STT
 
   const bottomRef = useRef(null)
-  const timerRef = useRef(null)
   const mediaRecorderRef = useRef(null)
   const audioChunksRef = useRef([])
+
+  // The custom hook for 2-minute countdown
+  const { formattedTime, isWarning } = useQuestionTimer(questionsCount, () => {
+    // Auto-submit when time is up
+    if (!loading) {
+      pushToast({ title: 'Time is up!', description: 'Moving to next step...', type: 'warning' })
+      handleSend()
+    }
+  })
+
+  // Timer for backend payload (duration taken)
+  const timerRef = useRef(null)
 
   useEffect(() => {
     timerRef.current = setInterval(() => setTimer(t => t + 1), 1000)
@@ -158,14 +170,18 @@ export default function UserInterview() {
 
   // ── Submit Answer ──────────────────────────────────────────────────────────
   const handleSend = async () => {
-    if (!answer.trim() || loading) return
+    // If answer is empty and time is up, submit a generic text so the interview continues
+    const finalAnswer = answer.trim() || "No answer provided within the time limit."
+    if (!answer.trim() && !loading && formattedTime !== "0:00") return
+    
+    if (loading) return
     if (!session || !currentQuestion) {
       pushToast({ title: 'Error', description: 'Interview session missing. Please restart.', type: 'error' })
       navigate('/user/interview-setup')
       return
     }
 
-    const userMsg = { id: messages.length + 1, type: 'user', text: answer.trim() }
+    const userMsg = { id: messages.length + 1, type: 'user', text: finalAnswer }
     setMessages(prev => [...prev, userMsg])
     setAnswer('')
     setLoading(true)
@@ -229,8 +245,9 @@ export default function UserInterview() {
           </p>
         </div>
         <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2 text-sm font-mono text-[#0f1f3d]">
-            <Clock size={14} className="text-[#c8601a]" /> {formatTime(timer)}
+          <div className={`flex items-center gap-2 text-sm font-mono transition ${isWarning ? 'text-rose-600 animate-pulse font-bold' : 'text-[#0f1f3d]'}`}>
+            <Clock size={14} className={isWarning ? 'text-rose-600' : 'text-[#c8601a]'} /> 
+            {formattedTime} left
           </div>
           <span className="text-xs bg-[#f4f2ee] text-[#5c5a57] px-3 py-1 rounded-full font-semibold">
             Q{questionsCount}/{totalQuestions}
