@@ -114,11 +114,17 @@ export default function UserAnalytics() {
   const chartData = [...sessions]
     .reverse()
     .slice(-10)
-    .map((s, i) => ({
-      label: `#${i + 1}`,
-      score: s.avg_score || 0,
-      type: String(s.interview_type).toLowerCase(),
-    }))
+    .map((s, i) => {
+      const rawScore = typeof s.avg_score === 'number' ? s.avg_score : 0
+      if (!s.avg_score && s.avg_score !== 0) {
+        console.warn(`[UserAnalytics] Session #${i + 1} (${s.session_id}) missing avg_score`, s)
+      }
+      return {
+        label: `#${i + 1}`,
+        score: Math.round(rawScore / 10),
+        type: String(s.interview_type).toLowerCase(),
+      }
+    })
 
   // Skill breakdown: avg score by interview type
   const typeGroups = {}
@@ -129,13 +135,13 @@ export default function UserAnalytics() {
   })
   const skillData = Object.entries(typeGroups).map(([type, scores]) => ({
     name: type.charAt(0).toUpperCase() + type.slice(1).replace('_', ' '),
-    value: scores.length ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0,
+    value: scores.length ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length / 10) : 0,
     color: typeColorMap[type] || '#9c9a96',
   }))
 
   const totalInterviews = sessions.length
   const allScores = sessions.filter(s => s.avg_score > 0).map(s => s.avg_score)
-  const avgScore = allScores.length ? (allScores.reduce((a, b) => a + b, 0) / allScores.length).toFixed(1) : 0
+  const avgScore = allScores.length ? (allScores.reduce((a, b) => a + b, 0) / allScores.length / 10).toFixed(1) : 0
   const completedCount = sessions.filter(s => String(s.status).includes('completed')).length
 
   return (
@@ -163,7 +169,7 @@ export default function UserAnalytics() {
           <div className="grid grid-cols-3 gap-4">
             {[
               { label: 'Total Sessions', value: totalInterviews },
-              { label: 'Avg Score', value: avgScore ? `${avgScore}/100` : '—' },
+              { label: 'Avg Score', value: avgScore ? `${avgScore}/10` : '—' },
               { label: 'Completed', value: completedCount },
             ].map((stat, i) => (
               <motion.div key={stat.label} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.07 }} className="surface-card p-5 text-center">
@@ -182,7 +188,7 @@ export default function UserAnalytics() {
                   <LineChart data={chartData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f4f2ee" />
                     <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#9c9a96' }} />
-                    <YAxis domain={[0, 100]} tick={{ fontSize: 11, fill: '#9c9a96' }} />
+                    <YAxis domain={[0, 10]} tick={{ fontSize: 11, fill: '#9c9a96' }} />
                     <Tooltip contentStyle={{ borderRadius: 12, border: '1px solid #e0dbd3', fontSize: 12 }} />
                     <Line type="monotone" dataKey="score" stroke="#c8601a" strokeWidth={2.5} dot={{ fill: '#c8601a', r: 4 }} />
                   </LineChart>
@@ -203,12 +209,12 @@ export default function UserAnalytics() {
                     <div key={s.name}>
                       <div className="flex justify-between text-sm mb-1">
                         <span className="font-medium text-[#5c5a57]">{s.name}</span>
-                        <span className="font-bold text-[#0f1f3d]">{s.value}%</span>
+                        <span className="font-bold text-[#0f1f3d]">{s.value}/10</span>
                       </div>
                       <div className="w-full h-2 bg-[#f4f2ee] rounded-full">
                         <motion.div
                           initial={{ width: 0 }}
-                          animate={{ width: `${s.value}%` }}
+                          animate={{ width: `${s.value * 10}%` }}
                           transition={{ delay: 0.3, duration: 0.8 }}
                           className="h-full rounded-full"
                           style={{ background: s.color }}
@@ -241,7 +247,7 @@ export default function UserAnalytics() {
                       <td className="py-3 font-medium text-[#0f1f3d]">{s.job_role}</td>
                       <td className="py-3 capitalize text-[#5c5a57]">{String(s.interview_type).replace('_', ' ')}</td>
                       <td className="py-3 text-[#5c5a57]">{s.questions_answered}/{s.total_questions}</td>
-                      <td className="py-3 font-bold text-[#c8601a]">{s.avg_score > 0 ? `${s.avg_score}/100` : '—'}</td>
+                      <td className="py-3 font-bold text-[#c8601a]">{s.avg_score > 0 ? `${Math.round(s.avg_score / 10)}/10` : '—'}</td>
                       <td className="py-3">
                         <span className={`text-xs px-2 py-1 rounded-full font-medium ${
                           String(s.status).includes('completed') ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'

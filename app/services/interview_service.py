@@ -1146,7 +1146,7 @@ async def _groq_evaluate_answer(
         # Fallback: penalize very short/empty answers, give modest score otherwise
         word_count = len(user_answer.strip().split())
         if word_count <= 2:
-            fallback_score = 5.0
+            fallback_score = 0.0
         elif word_count <= 10:
             fallback_score = 20.0
         elif word_count <= 30:

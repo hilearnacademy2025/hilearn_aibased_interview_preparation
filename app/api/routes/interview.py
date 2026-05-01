@@ -1184,6 +1184,13 @@ async def get_interview_history(
                 # derive overall_score from content_score if missing
                 scores.append(round(a.get("content_score") * 0.95, 1))
                 
+        if answers and not scores:
+            logger.warning(
+                "[INTERVIEW-HISTORY] session={} has {} answers but none contain "
+                "overall_score or content_score — avg_score will be 0",
+                interview.get("session_id"), len(answers),
+            )
+
         avg_score = round(sum(scores) / len(scores), 1) if scores else 0
         
         summaries.append({

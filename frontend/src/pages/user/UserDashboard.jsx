@@ -156,7 +156,7 @@ const typeColor = (type) => {
 }
 
 const scoreColor = (score) =>
-  score >= 80 ? 'bg-green-50 text-green-700' : score >= 50 ? 'bg-amber-50 text-amber-700' : 'bg-red-50 text-red-600'
+  score >= 8 ? 'bg-green-50 text-green-700' : score >= 5 ? 'bg-amber-50 text-amber-700' : 'bg-red-50 text-red-600'
 
 const relativeTime = (isoStr) => {
   if (!isoStr) return ''
@@ -193,14 +193,14 @@ export default function UserDashboard() {
 
   // Stats from real session data
   const totalInterviews = totalCount
-  const scores = sessions.filter(s => s.avg_score > 0).map(s => s.avg_score)
+  const scores = sessions.filter(s => s.avg_score > 0).map(s => Math.round(s.avg_score / 10))
   const avgScore = scores.length ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0
   const bestScore = scores.length ? Math.max(...scores) : 0
 
   const stats = [
     { icon: Zap,       label: 'Total Interviews', value: totalInterviews || 0,         color: 'bg-[#0f1f3d]/8 text-[#0f1f3d]' },
-    { icon: BarChart3, label: 'Avg Score',        value: avgScore ? `${avgScore}/100` : '—', color: 'bg-[#c8601a]/10 text-[#c8601a]' },
-    { icon: Award,     label: 'Best Score',       value: bestScore ? `${bestScore}/100` : '—', color: 'bg-green-50 text-green-700' },
+    { icon: BarChart3, label: 'Avg Score',        value: avgScore ? `${avgScore}/10` : '—', color: 'bg-[#c8601a]/10 text-[#c8601a]' },
+    { icon: Award,     label: 'Best Score',       value: bestScore ? `${bestScore}/10` : '—', color: 'bg-green-50 text-green-700' },
     { icon: Mic,       label: 'This Session',     value: sessions[0]?.job_role?.split(' ')[0] || '—', color: 'bg-purple-50 text-purple-700' },
   ]
 
@@ -275,8 +275,8 @@ export default function UserDashboard() {
                       {iv.job_role} · {relativeTime(iv.started_at)} · {iv.questions_answered}/{iv.total_questions} Q
                     </p>
                   </div>
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold ${scoreColor(iv.avg_score)}`}>
-                    {iv.avg_score > 0 ? iv.avg_score : '—'}
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold ${scoreColor(iv.avg_score > 0 ? Math.round(iv.avg_score / 10) : 0)}`}>
+                    {iv.avg_score > 0 ? Math.round(iv.avg_score / 10) : '—'}
                   </div>
                 </div>
               ))}
