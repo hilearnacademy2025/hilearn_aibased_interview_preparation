@@ -4,7 +4,7 @@
  */
 import { useCallback, useEffect, useRef } from 'react'
 
-export default function useScoreCelebration(score, threshold = 8) {
+export default function useScoreCelebration(score, threshold = 80) {
   const confettiRef = useRef(null)
   const firedRef = useRef(false)
 

@@ -1083,13 +1083,18 @@ async def _groq_evaluate_answer(
     Falls back to a word-count heuristic on any error.
     """
     prompt = (
-        f"You are evaluating an interview answer for a {job_role} position "
+        f"You are a STRICT interview evaluator for a {job_role} position "
         f"({interview_type.value} interview).\n\n"
         f"Question: {question}\n\n"
         f"Candidate's Answer: {user_answer}\n\n"
-        "Rate this answer from 0 to 10 based on content quality, relevance, and completeness. "
+        "SCORING RULES — you MUST follow these strictly:\n"
+        "- If the answer is WRONG, irrelevant, gibberish, or does not address the question at all: score 0-20\n"
+        "- If the answer is PARTIALLY correct, vague, or incomplete but shows some understanding: score 30-70\n"
+        "- If the answer is CORRECT, relevant, well-structured, and demonstrates strong knowledge: score 80-100\n"
+        "- An empty or single-word nonsense answer MUST score 0-5\n"
+        "- Do NOT be generous. Evaluate the actual correctness of the content.\n\n"
         "Return ONLY valid JSON with no extra text:\n"
-        '{\"content_score\": <number 0-10>, \"feedback\": \"<one concise sentence>\"}'
+        '{\"content_score\": <number 0-100>, \"feedback\": \"<one concise sentence explaining the score>\"}'
     )
 
     logger.info(
@@ -1106,13 +1111,15 @@ async def _groq_evaluate_answer(
                     "role": "system",
                     "content": (
                         "You are a strict but fair interview evaluator. "
+                        "You must score based on ACTUAL CORRECTNESS of the answer. "
+                        "Wrong answers get low scores (0-20). Do not give high scores to incorrect answers. "
                         "Always respond with valid JSON only."
                     ),
                 },
                 {"role": "user", "content": prompt},
             ],
             max_tokens=200,
-            temperature=0.3,
+            temperature=0.2,
         )
         raw = response.choices[0].message.content.strip()
         logger.debug("Groq | evaluate_answer | raw={}", raw)
@@ -1124,8 +1131,8 @@ async def _groq_evaluate_answer(
             raw = raw.strip()
 
         result = json.loads(raw)
-        score = float(result.get("content_score", 5.0))
-        score = max(0.0, min(10.0, score))
+        score = float(result.get("content_score", 0.0))
+        score = max(0.0, min(100.0, score))
         feedback = str(result.get("feedback", "Good attempt. Keep practising."))
 
         logger.success(
@@ -1136,8 +1143,16 @@ async def _groq_evaluate_answer(
 
     except Exception as exc:
         logger.error("Groq | evaluate_answer | FAILED | error={} | using fallback", exc)
-        word_count = len(user_answer.split())
-        fallback_score = round(min(10.0, max(1.0, word_count / 20)), 1)
+        # Fallback: penalize very short/empty answers, give modest score otherwise
+        word_count = len(user_answer.strip().split())
+        if word_count <= 2:
+            fallback_score = 5.0
+        elif word_count <= 10:
+            fallback_score = 20.0
+        elif word_count <= 30:
+            fallback_score = 40.0
+        else:
+            fallback_score = 50.0
         return {
             "content_score": fallback_score,
             "feedback": "Could not evaluate at this time. Keep practising!",
@@ -1161,7 +1176,7 @@ async def _groq_generate_followup(
     """
     depth_hint = (
         "The answer was weak, so probe for basic understanding."
-        if content_score < 5
+        if content_score < 50
         else "The answer was decent, so probe for depth and edge cases."
     )
 
@@ -1252,6 +1267,7 @@ async def _persist_answer_to_db(
     answer_text: str,
     content_score: float,
     feedback_text: str,
+    overall_score: float = 0.0,
 ) -> None:
     """
     Append an answer to the interview document in MongoDB.
@@ -1267,6 +1283,7 @@ async def _persist_answer_to_db(
             "answer_text": answer_text,
             "submitted_at": datetime.utcnow().isoformat(),
             "content_score": content_score,
+            "overall_score": overall_score,
             "feedback": feedback_text,
         }
         await db.add_answer_to_interview(session_id, answer_record)
@@ -1677,6 +1694,7 @@ class InterviewService:
             answer_text=payload.answer_text,
             content_score=content_score,
             feedback_text=groq_feedback,
+            overall_score=derived,
         )
         await _persist_feedback_to_db(
             session_id=payload.session_id,
@@ -1708,7 +1726,20 @@ class InterviewService:
             await _update_session_status_in_db(
                 payload.session_id, InterviewStatus.COMPLETED.value
             )
-            await _update_user_stats_in_db(session["user_id"], derived)
+            
+            answers = session.get("answers", [])
+            if answers:
+                avg_overall = round(sum(a.get("overall_score", 0) for a in answers) / len(answers), 1)
+                avg_content = round(sum(a.get("content_score", 0) for a in answers) / len(answers), 1)
+                
+                feedback.overall_score = avg_overall
+                feedback.content_score = avg_content
+                feedback.completeness_score = round(avg_content * 0.9, 1)
+                feedback.relevance_score = avg_overall
+                
+                await _update_user_stats_in_db(session["user_id"], avg_overall)
+            else:
+                await _update_user_stats_in_db(session["user_id"], derived)
 
         return SubmitAnswerResponse(
             session_id=payload.session_id,
@@ -1770,6 +1801,17 @@ class InterviewService:
                 user_id, exc,
             )
             return []
+
+    async def count_user_interviews(self, user_id: str) -> int:
+        """Return the total number of interviews for a given user."""
+        try:
+            db = _get_db_service()
+            if not db.is_connected:
+                return 0
+            return await db.count_user_interviews(user_id)
+        except Exception as exc:
+            logger.error("count_user_interviews failed | user_id={} | error={}", user_id, exc)
+            return 0
 
     # async def get_user_sessions(self, user_id: str) -> list:
     #     """Return all sessions for a given user_id from in-memory store."""

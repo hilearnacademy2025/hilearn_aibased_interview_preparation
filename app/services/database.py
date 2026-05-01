@@ -394,6 +394,17 @@ class DatabaseService:
             logger.error("[DB] get_user_interviews failed | user_id={} | error={}", user_id, exc)
             return []
 
+    async def count_user_interviews(self, user_id: str) -> int:
+        db = self._get_db()
+        if db is None:
+            return 0
+
+        try:
+            return await db.interviews.count_documents({"user_id": user_id})
+        except Exception as exc:
+            logger.error("[DB] count_user_interviews failed | user_id={} | error={}", user_id, exc)
+            return 0
+
     # ───────────────────────────────────────────────────────────────────────
     # Feedback CRUD
     # ───────────────────────────────────────────────────────────────────────

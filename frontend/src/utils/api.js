@@ -433,6 +433,11 @@ export const getMeApi = async () => {
   return data
 }
 
+export const updateProfileApi = async (payload) => {
+  const { data } = await api.put('/auth/profile', payload)
+  return data
+}
+
 // ── Interview APIs ─────────────────────────────────────────────────────────────
 export const startInterview = async (payload) => {
   const { data } = await api.post('/interview/start-interview', payload)
@@ -451,6 +456,18 @@ export const getSession = async (sessionId) => {
 
 export const getUserSessions = async (userId) => {
   const { data } = await api.get(`/interview/sessions/user/${userId}`)
+  return data
+}
+
+export const getUserHistory = async (userId, limit = 20, skip = 0) => {
+  const { data } = await api.get(`/interview/history/${userId}`, {
+    params: { limit, skip }
+  })
+  return data
+}
+
+export const getLatestFeedback = async (userId) => {
+  const { data } = await api.get(`/interview/latest-feedback/${userId}`)
   return data
 }
 
@@ -514,6 +531,16 @@ export const getAdminAnalytics = async () => {
 // ── Real Analytics API (Enhanced) ──────────────────────────────────────────
 export const getAdminRealAnalytics = async () => {
   const { data } = await api.get('/admin/real-analytics')
+  return data
+}
+
+export const getAdminSettings = async () => {
+  const { data } = await api.get('/admin/settings')
+  return data
+}
+
+export const updateAdminSettings = async (payload) => {
+  const { data } = await api.put('/admin/settings', payload)
   return data
 }
 
@@ -619,7 +646,7 @@ export const respondToOffer = async (offerId, status, responseMessage = '') => {
 //   timeout: 30000,
 //   headers: { 'Content-Type': 'application/json' },
 // })
-const companyApi = axios.create({
+export const companyApi = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || '/api/v1',
   timeout: 30000,
   headers: { 'Content-Type': 'application/json' },

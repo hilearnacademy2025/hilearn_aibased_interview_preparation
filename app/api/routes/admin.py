@@ -780,6 +780,70 @@ async def admin_dashboard(
 
 
 # ─────────────────────────────────────────────────────────
+# 9. GET /admin/settings
+# ─────────────────────────────────────────────────────────
+@router.get(
+    "/settings",
+    response_model=APIResponse,
+    summary="Get Admin Settings",
+    description="Retrieve platform configuration.",
+)
+async def get_settings(
+    admin: Dict[str, Any] = Depends(require_admin),
+) -> APIResponse:
+    logger.info("[ADMIN] GET /admin/settings | admin={}", admin.get("sub"))
+    
+    settings_doc = await db.settings.find_one({"_id": "platform_settings"})
+    
+    # Default settings if none exist
+    settings = {
+        "free_tier_limit": 3,
+        "pro_plan_price": 299,
+    }
+    
+    if settings_doc:
+        settings["free_tier_limit"] = settings_doc.get("free_tier_limit", 3)
+        settings["pro_plan_price"] = settings_doc.get("pro_plan_price", 299)
+        
+    return APIResponse(
+        message="Settings retrieved",
+        data=settings,
+    )
+
+# ─────────────────────────────────────────────────────────
+# 10. PUT /admin/settings
+# ─────────────────────────────────────────────────────────
+@router.put(
+    "/settings",
+    response_model=APIResponse,
+    summary="Update Admin Settings",
+    description="Update platform configuration.",
+)
+async def update_settings(
+    payload: Dict[str, Any],
+    admin: Dict[str, Any] = Depends(require_admin),
+) -> APIResponse:
+    logger.info("[ADMIN] PUT /admin/settings | admin={}", admin.get("sub"))
+    
+    update_data = {}
+    if "free_tier_limit" in payload:
+        update_data["free_tier_limit"] = int(payload["free_tier_limit"])
+    if "pro_plan_price" in payload:
+        update_data["pro_plan_price"] = int(payload["pro_plan_price"])
+        
+    if update_data:
+        update_data["updated_at"] = datetime.utcnow()
+        await db.settings.update_one(
+            {"_id": "platform_settings"},
+            {"$set": update_data},
+            upsert=True
+        )
+        
+    return APIResponse(
+        message="Settings updated successfully"
+    )
+
+# ─────────────────────────────────────────────────────────
 # 2. GET /admin/users
 # ─────────────────────────────────────────────────────────
 @router.get(

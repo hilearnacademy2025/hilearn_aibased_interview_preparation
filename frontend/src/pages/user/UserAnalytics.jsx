@@ -87,7 +87,7 @@ import { motion } from 'framer-motion'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { Loader } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
-import { getUserSessions } from '../../utils/api'
+import { getUserHistory } from '../../utils/api'
 import { Link } from 'react-router-dom'
 
 const typeColorMap = {
@@ -104,8 +104,8 @@ export default function UserAnalytics() {
 
   useEffect(() => {
     if (!user?.user_id) { setLoading(false); return }
-    getUserSessions(user.user_id)
-      .then(res => setSessions(res?.data?.sessions || []))
+    getUserHistory(user.user_id, 50, 0) // get up to 50 for analytics
+      .then(res => setSessions(res?.data?.interviews || []))
       .catch(() => setSessions([]))
       .finally(() => setLoading(false))
   }, [user?.user_id])
@@ -129,7 +129,7 @@ export default function UserAnalytics() {
   })
   const skillData = Object.entries(typeGroups).map(([type, scores]) => ({
     name: type.charAt(0).toUpperCase() + type.slice(1).replace('_', ' '),
-    value: scores.length ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length * 10) : 0,
+    value: scores.length ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0,
     color: typeColorMap[type] || '#9c9a96',
   }))
 
@@ -163,7 +163,7 @@ export default function UserAnalytics() {
           <div className="grid grid-cols-3 gap-4">
             {[
               { label: 'Total Sessions', value: totalInterviews },
-              { label: 'Avg Score', value: avgScore ? `${avgScore}/10` : '—' },
+              { label: 'Avg Score', value: avgScore ? `${avgScore}/100` : '—' },
               { label: 'Completed', value: completedCount },
             ].map((stat, i) => (
               <motion.div key={stat.label} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.07 }} className="surface-card p-5 text-center">
@@ -182,7 +182,7 @@ export default function UserAnalytics() {
                   <LineChart data={chartData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f4f2ee" />
                     <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#9c9a96' }} />
-                    <YAxis domain={[0, 10]} tick={{ fontSize: 11, fill: '#9c9a96' }} />
+                    <YAxis domain={[0, 100]} tick={{ fontSize: 11, fill: '#9c9a96' }} />
                     <Tooltip contentStyle={{ borderRadius: 12, border: '1px solid #e0dbd3', fontSize: 12 }} />
                     <Line type="monotone" dataKey="score" stroke="#c8601a" strokeWidth={2.5} dot={{ fill: '#c8601a', r: 4 }} />
                   </LineChart>
@@ -241,7 +241,7 @@ export default function UserAnalytics() {
                       <td className="py-3 font-medium text-[#0f1f3d]">{s.job_role}</td>
                       <td className="py-3 capitalize text-[#5c5a57]">{String(s.interview_type).replace('_', ' ')}</td>
                       <td className="py-3 text-[#5c5a57]">{s.questions_answered}/{s.total_questions}</td>
-                      <td className="py-3 font-bold text-[#c8601a]">{s.avg_score > 0 ? `${s.avg_score}/10` : '—'}</td>
+                      <td className="py-3 font-bold text-[#c8601a]">{s.avg_score > 0 ? `${s.avg_score}/100` : '—'}</td>
                       <td className="py-3">
                         <span className={`text-xs px-2 py-1 rounded-full font-medium ${
                           String(s.status).includes('completed') ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'

@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
-import { ChevronRight, X, Briefcase, BarChart3, Rocket, Check } from 'lucide-react'
+import { ChevronRight, X, Briefcase, BarChart3, Rocket, Check, Loader2 } from 'lucide-react'
+import { updateProfileApi } from '../utils/api'
 
 const ROLES = [
   'Backend Engineer', 'Frontend Developer', 'Full Stack Developer',
@@ -27,6 +28,7 @@ export default function OnboardingWizard({ onComplete }) {
   const [step, setStep] = useState(0)
   const [role, setRole] = useState('')
   const [level, setLevel] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const handleSkip = () => {
     localStorage.setItem('hasCompletedOnboarding', 'true')
@@ -43,12 +45,21 @@ export default function OnboardingWizard({ onComplete }) {
     if (step > 0) setStep(s => s - 1)
   }
 
-  const handleStart = () => {
+  const handleStart = async () => {
     localStorage.setItem('hasCompletedOnboarding', 'true')
     if (role) localStorage.setItem('hilearn_target_role', role)
     if (level) localStorage.setItem('hilearn_experience_level', level)
-    if (onComplete) onComplete()
-    navigate('/user/interview-setup')
+    
+    try {
+      setIsSubmitting(true)
+      await updateProfileApi({ target_role: role, experience_level: level })
+    } catch (err) {
+      console.error('Failed to save preferences:', err)
+    } finally {
+      setIsSubmitting(false)
+      if (onComplete) onComplete()
+      navigate('/user/interview-setup')
+    }
   }
 
   return (
@@ -251,6 +262,7 @@ export default function OnboardingWizard({ onComplete }) {
 
                 <button
                   onClick={handleStart}
+                  disabled={isSubmitting}
                   style={{
                     marginTop: '20px',
                     width: '100%',
@@ -261,15 +273,17 @@ export default function OnboardingWizard({ onComplete }) {
                     color: 'white',
                     fontSize: '15px',
                     fontWeight: 700,
-                    cursor: 'pointer',
+                    cursor: isSubmitting ? 'not-allowed' : 'pointer',
                     boxShadow: '0 6px 20px rgba(200,96,26,0.35)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     gap: '8px',
+                    opacity: isSubmitting ? 0.7 : 1,
                   }}
                 >
-                  <Rocket size={16} /> Start Your First Interview
+                  {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Rocket size={16} />} 
+                  {isSubmitting ? 'Saving...' : 'Start Your First Interview'}
                 </button>
               </motion.div>
             )}

@@ -3,10 +3,12 @@ import { useParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Loader, ExternalLink } from 'lucide-react'
 import ShareResultCard from '../components/ShareResultCard'
+import api from '../utils/api'
 
 /**
  * ShareResult — public read-only page for sharing interview results
  * Route: /share/:interviewId
+ * No login required — anyone with the link can view
  */
 export default function ShareResult() {
   const { interviewId } = useParams()
@@ -15,38 +17,59 @@ export default function ShareResult() {
   const [error, setError] = useState(null)
 
   useEffect(() => {
-    // Try to load from localStorage first (for the sharer's own view)
-    const stored = localStorage.getItem('hilearn_complete_feedback')
-    if (stored) {
-      try {
-        const data = JSON.parse(stored)
-        if (data?.session_id === interviewId || !interviewId) {
-          setResult({
-            score: data?.feedback?.overall_score ?? data?.overall_score ?? 0,
-            jobRole: data?.job_role || '',
-            interviewType: data?.interview_type || '',
-            userName: data?.user_name || 'HiLearn Student',
-            date: data?.completed_at
-              ? new Date(data.completed_at).toLocaleDateString()
-              : new Date().toLocaleDateString(),
-          })
-          setLoading(false)
-          return
+    const fetchShareData = async () => {
+      // ── Step 1: Fetch data from the backend (real data) ──
+      if (interviewId) {
+        try {
+          const { data } = await api.get(`/interview/share/${interviewId}`)
+          if (data?.data) {
+            const d = data.data
+            setResult({
+              score: d.score ?? 0,
+              jobRole: d.job_role || '',
+              interviewType: d.interview_type || '',
+              userName: d.user_name || 'HiLearn Student',
+              date: d.completed_at
+                ? new Date(d.completed_at).toLocaleDateString()
+                : new Date().toLocaleDateString(),
+            })
+            setLoading(false)
+            return
+          }
+        } catch {
+          // Not found from backend - try lowstore fallback
         }
-      } catch {
-        // Fall through to API
       }
+
+      // ── Step 2: localStorage fallback (same browser) ──
+      const stored = localStorage.getItem('hilearn_complete_feedback')
+      if (stored) {
+        try {
+          const data = JSON.parse(stored)
+          if (data?.session_id === interviewId || !interviewId) {
+            setResult({
+              score: data?.feedback?.overall_score ?? data?.overall_score ?? 0,
+              jobRole: data?.job_role || '',
+              interviewType: data?.interview_type || '',
+              userName: data?.user_name || 'HiLearn Student',
+              date: data?.completed_at
+                ? new Date(data.completed_at).toLocaleDateString()
+                : new Date().toLocaleDateString(),
+            })
+            setLoading(false)
+            return
+          }
+        } catch {
+          // ignore
+        }
+      }
+
+      // ── Step 3: Kuch nahi mila ──
+      setError('Result not found. The link may have expired.')
+      setLoading(false)
     }
 
-    // Fallback: show a generic shared result
-    setResult({
-      score: 0,
-      jobRole: 'Interview',
-      interviewType: 'Mock',
-      userName: 'HiLearn Student',
-      date: new Date().toLocaleDateString(),
-    })
-    setLoading(false)
+    fetchShareData()
   }, [interviewId])
 
   if (loading) {
@@ -82,7 +105,6 @@ export default function ShareResult() {
       fontFamily: "'DM Sans', 'Segoe UI', sans-serif",
       padding: '40px 16px',
     }}>
-      {/* SEO Meta */}
       <title>Interview Results | HiLearn AI Interview Prep</title>
 
       <div style={{ maxWidth: '480px', margin: '0 auto' }}>
@@ -116,9 +138,7 @@ export default function ShareResult() {
           style={{ textAlign: 'center', marginTop: '32px' }}
         >
           <a
-            href="https://hilearn.in"
-            target="_blank"
-            rel="noopener noreferrer"
+            href="/signup"
             style={{
               display: 'inline-flex', alignItems: 'center', gap: '8px',
               padding: '14px 32px', borderRadius: '50px',

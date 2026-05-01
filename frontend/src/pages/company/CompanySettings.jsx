@@ -1,19 +1,7 @@
 import { motion } from 'framer-motion'
 import { useState, useEffect } from 'react'
 import { Settings, Save, Lock, Info, Loader2, CheckCircle2 } from 'lucide-react'
-import axios from 'axios'
-
-const companyApi = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || '/api/v1',
-  timeout: 30000,
-  headers: { 'Content-Type': 'application/json' },
-})
-
-companyApi.interceptors.request.use((config) => {
-  const token = localStorage.getItem('hilearn_company_token')
-  if (token) config.headers.Authorization = `Bearer ${token}`
-  return config
-})
+import { companyApi } from '../../utils/api'
 
 export default function CompanySettings() {
   const [activeTab, setActiveTab] = useState('profile')

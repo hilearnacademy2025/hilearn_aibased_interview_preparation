@@ -138,7 +138,7 @@ import { motion } from 'framer-motion'
 import { Link } from 'react-router-dom'
 import { Mic, BarChart3, Award, Zap, ArrowUpRight, ChevronRight, BookOpen, Loader } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
-import { getUserSessions } from '../../utils/api'
+import { getUserHistory } from '../../utils/api'
 import OnboardingWizard from '../../components/OnboardingWizard'
 
 const tips = [
@@ -156,7 +156,7 @@ const typeColor = (type) => {
 }
 
 const scoreColor = (score) =>
-  score >= 8 ? 'bg-green-50 text-green-700' : score >= 5 ? 'bg-amber-50 text-amber-700' : 'bg-red-50 text-red-600'
+  score >= 80 ? 'bg-green-50 text-green-700' : score >= 50 ? 'bg-amber-50 text-amber-700' : 'bg-red-50 text-red-600'
 
 const relativeTime = (isoStr) => {
   if (!isoStr) return ''
@@ -172,10 +172,9 @@ const relativeTime = (isoStr) => {
 export default function UserDashboard() {
   const { user } = useAuth()
   const [sessions, setSessions] = useState([])
+  const [totalCount, setTotalCount] = useState(0)
   const [loadingSessions, setLoadingSessions] = useState(true)
-  const [showOnboarding, setShowOnboarding] = useState(() => {
-    try { return localStorage.getItem('hasCompletedOnboarding') !== 'true' } catch { return false }
-  })
+  const [showOnboarding, setShowOnboarding] = useState(() => !localStorage.getItem('hasCompletedOnboarding'))
 
   const firstName = user?.name?.split(' ')[0] || 'there'
   const hour = new Date().getHours()
@@ -183,22 +182,25 @@ export default function UserDashboard() {
 
   useEffect(() => {
     if (!user?.user_id) { setLoadingSessions(false); return }
-    getUserSessions(user.user_id)
-      .then(res => setSessions(res?.data?.sessions || []))
+    getUserHistory(user.user_id, 20, 0)
+      .then(res => {
+        setSessions(res?.data?.interviews || [])
+        setTotalCount(res?.data?.total_count || res?.data?.interviews?.length || 0)
+      })
       .catch(() => setSessions([]))
       .finally(() => setLoadingSessions(false))
   }, [user?.user_id])
 
   // Stats from real session data
-  const totalInterviews = sessions.length
+  const totalInterviews = totalCount
   const scores = sessions.filter(s => s.avg_score > 0).map(s => s.avg_score)
   const avgScore = scores.length ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0
   const bestScore = scores.length ? Math.max(...scores) : 0
 
   const stats = [
     { icon: Zap,       label: 'Total Interviews', value: totalInterviews || 0,         color: 'bg-[#0f1f3d]/8 text-[#0f1f3d]' },
-    { icon: BarChart3, label: 'Avg Score',        value: avgScore ? `${avgScore}/10` : '—', color: 'bg-[#c8601a]/10 text-[#c8601a]' },
-    { icon: Award,     label: 'Best Score',       value: bestScore ? `${bestScore}/10` : '—', color: 'bg-green-50 text-green-700' },
+    { icon: BarChart3, label: 'Avg Score',        value: avgScore ? `${avgScore}/100` : '—', color: 'bg-[#c8601a]/10 text-[#c8601a]' },
+    { icon: Award,     label: 'Best Score',       value: bestScore ? `${bestScore}/100` : '—', color: 'bg-green-50 text-green-700' },
     { icon: Mic,       label: 'This Session',     value: sessions[0]?.job_role?.split(' ')[0] || '—', color: 'bg-purple-50 text-purple-700' },
   ]
 

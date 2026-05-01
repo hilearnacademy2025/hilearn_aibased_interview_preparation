@@ -274,7 +274,7 @@ async def update_profile(
         return APIResponse(message="Password updated successfully.")
 
     # ── Profile Fields Update ──────────────────────────────────────────────
-    allowed_fields = {"name", "phone", "location", "target_role", "bio"}
+    allowed_fields = {"name", "phone", "location", "target_role", "bio", "experience_level"}
     update_data = {k: v for k, v in payload.items() if k in allowed_fields and v is not None}
 
     if not update_data:

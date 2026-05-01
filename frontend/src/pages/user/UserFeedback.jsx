@@ -449,7 +449,8 @@ import {
   BookOpen, ExternalLink, ChevronDown, ChevronUp,
   Star, Zap, MessageSquare, BarChart3, Award, Clock, Mail, Loader, Share2, Copy
 } from 'lucide-react';
-import { sendResultsEmail, generateShareLink } from '../../utils/api';
+import { sendResultsEmail, generateShareLink, getLatestFeedback } from '../../utils/api';
+import { useAuth } from '../../context/AuthContext';
 import useScoreCelebration from '../../hooks/useScoreCelebration';
 
 const LMS_URL = 'https://hilearn-lms-tool.vercel.app/courses';
@@ -464,19 +465,19 @@ function getLMSRec(score, improvements = [], jobRole = '') {
     return { tag: 'Digital Marketing', title: 'Digital Marketing Certification', desc: 'SEO, paid ads, content strategy and analytics — become a full-stack marketer', accent: '#f59e0b' };
   if (text.includes('data') || text.includes('analytics') || text.includes('sql'))
     return { tag: 'Data Analytics', title: 'Data Analytics with Python & SQL', desc: 'Strengthen your analytics skills with real-world projects', accent: '#6366f1' };
-  if (score >= 8)
+  if (score >= 80)
     return { tag: 'Advanced', title: 'Advanced Interview Preparation Bundle', desc: 'System design, leadership rounds & executive communication', accent: '#10b981' };
-  if (score >= 5)
+  if (score >= 50)
     return { tag: 'Intermediate', title: 'Core Interview Skills Program', desc: 'Improve DSA, system design basics & communication clarity', accent: '#c8601a' };
   return { tag: 'Foundation', title: 'Interview Prep Foundation Course', desc: 'Start with communication, problem-solving & core technical concepts', accent: '#c8601a' };
 }
 
-function ScoreRing({ score, max = 10 }) {
+function ScoreRing({ score, max = 100 }) {
   const [val, setVal] = useState(0);
   const r = 44, circ = 2 * Math.PI * r;
   const pct = Math.min(score / max, 1);
-  const color = score >= 8 ? '#10b981' : score >= 5 ? '#c8601a' : score > 0 ? '#ef4444' : '#d1cdc7';
-  const label = score >= 8 ? 'Excellent!' : score >= 5 ? 'Good Job!' : score > 0 ? 'Keep Going!' : 'No data yet';
+  const color = score >= 80 ? '#10b981' : score >= 50 ? '#c8601a' : score > 0 ? '#ef4444' : '#d1cdc7';
+  const label = score >= 80 ? 'Excellent!' : score >= 50 ? 'Good Job!' : score > 0 ? 'Keep Going!' : 'No data yet';
 
   useEffect(() => {
     if (!score) return;
@@ -484,7 +485,7 @@ function ScoreRing({ score, max = 10 }) {
     const run = ts => {
       if (!start) start = ts;
       const p = Math.min((ts - start) / 1200, 1);
-      setVal(+(score * p).toFixed(1));
+      setVal(Math.round(score * p));
       if (p < 1) requestAnimationFrame(run);
     };
     requestAnimationFrame(run);
@@ -504,7 +505,7 @@ function ScoreRing({ score, max = 10 }) {
           />
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-3xl font-bold text-[#0f1f3d]">{val > 0 ? val : score > 0 ? score : '—'}</span>
+          <span className="text-3xl font-bold text-[#0f1f3d]">{val > 0 ? val : score > 0 ? Math.round(score) : '—'}</span>
           <span className="text-xs text-[#9c9a96]">/ {max}</span>
         </div>
       </div>
@@ -513,13 +514,13 @@ function ScoreRing({ score, max = 10 }) {
   );
 }
 
-function Bar({ label, value, max = 10, color = '#c8601a', delay = 0 }) {
+function Bar({ label, value, max = 100, color = '#c8601a', delay = 0 }) {
   if (value == null) return null;
   return (
     <div className="space-y-1.5">
       <div className="flex justify-between items-center">
         <span className="text-xs text-[#5c5a57]">{label}</span>
-        <span className="text-xs font-bold text-[#0f1f3d]">{value}/{max}</span>
+        <span className="text-xs font-bold text-[#0f1f3d]">{Math.round(value)}/{max}</span>
       </div>
       <div className="h-2 rounded-full bg-[#f0ede9] overflow-hidden">
         <motion.div className="h-full rounded-full" style={{ background: color }}
@@ -540,9 +541,28 @@ export default function UserFeedback() {
   const [showShareOptions, setShowShareOptions] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
 
-  const raw = JSON.parse(localStorage.getItem('hilearn_complete_feedback') || 'null');
+  const [serverData, setServerData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
+
+  useEffect(() => {
+    const fetchLatest = async () => {
+      if (!user?.user_id) return;
+      try {
+        const res = await getLatestFeedback(user.user_id);
+        if (res.data) setServerData(res.data);
+      } catch (err) {
+        console.error('Failed to fetch latest feedback', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchLatest();
+  }, [user]);
+
+  const raw = serverData || JSON.parse(localStorage.getItem('hilearn_complete_feedback') || 'null');
   const latest = JSON.parse(localStorage.getItem('hilearn_latest_feedback') || 'null');
-  const session = JSON.parse(localStorage.getItem('hilearn_interview_session') || 'null');
+  const session = serverData || JSON.parse(localStorage.getItem('hilearn_interview_session') || 'null');
 
   const fb = raw?.feedback || raw || latest || {};
   const score = fb.overall_score ?? 0;
@@ -724,8 +744,8 @@ export default function UserFeedback() {
                 )}
               </div>
               <div className="space-y-2.5">
-                <Bar label="Clarity" value={voice.clarity_score != null ? +voice.clarity_score.toFixed(1) : null} color="#10b981" />
-                <Bar label="Confidence" value={voice.confidence_score != null ? +voice.confidence_score.toFixed(1) : null} color="#6366f1" />
+                <Bar label="Clarity" value={voice.clarity_score != null ? Math.round(voice.clarity_score * 10) : null} color="#10b981" />
+                <Bar label="Confidence" value={voice.confidence_score != null ? Math.round(voice.confidence_score * 10) : null} color="#6366f1" />
               </div>
               {voice.filler_words_detected?.length > 0 && (
                 <p className="text-xs text-[#9c9a96] mt-3">
